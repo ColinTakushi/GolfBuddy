@@ -46,3 +46,5 @@ for i, player in enumerate(scores):
     parScore = sum(par)
     scored = totals[i] - parScore
     print(f"Thru 18: par: {parScore} Total: {totals[i]} Scored: {scored}")
+
+    
