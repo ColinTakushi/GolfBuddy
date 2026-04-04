@@ -168,6 +168,44 @@ def scan_and_store(image_path: str) -> None:
         db.close()
 
 
+def parse_image(image_path: str) -> dict:
+    """Call Gemini and return the parsed JSON dict with imagePath added. No prompts, no saving."""
+    data = _call_gemini(image_path)
+    data["imagePath"] = image_path
+    return data
+
+
+def save_from_data(data: dict) -> None:
+    """Save a reviewed scorecard dict to the database. No interactive prompts."""
+    course = data["course"]
+    players = data["players"]
+    image_path = data.get("imagePath")
+
+    db = SessionLocal()
+    try:
+        image_id = None
+        if image_path and os.path.exists(image_path):
+            image = save_image_to_db(db, image_path)
+            image_id = image.id
+            print(f"Image stored (ID: {image_id})")
+
+        for player in players:
+            print(f"\nSaving scorecard for '{player['name']}' at '{course['name']}'...")
+            scorecard = save_scorecard_to_db(
+                db=db,
+                username=player["name"],
+                course_name=course["name"],
+                scores=player["scores"],
+                course_pars=course["holePars"],
+                image_id=image_id,
+                raw_ocr_data=data,
+            )
+            print(f"  Saved! Scorecard ID: {scorecard.id}")
+            print_user_breakdown(player["name"])
+    finally:
+        db.close()
+
+
 def store_json(json_path: str) -> None:
     """
     Full pipeline:

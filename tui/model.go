@@ -20,6 +20,7 @@ const (
 	stateSubMenu
 	stateInput
 	stateOutput
+	stateScorecard
 )
 
 const (
@@ -48,12 +49,21 @@ func init() {
 
 // ── Menu data ────────────────────────────────────────────────────────────────
 
+type scanModeType int
+
+const (
+	scanModeNone  scanModeType = iota
+	scanModeImage              // parse via Gemini, show scorecard editor
+	scanModeJSON               // read JSON file directly, show scorecard editor
+)
+
 type subItem struct {
 	label       string
 	prompt      string
 	interactive bool
-	fileInput   bool     // enable tab file completion
-	cmd         []string // "<input>" replaced with user value
+	fileInput   bool         // enable tab file completion
+	scanMode    scanModeType // non-zero = triggers scorecard editor instead of runSub
+	cmd         []string     // "<input>" replaced with user value
 }
 
 type menuItem struct {
@@ -68,18 +78,16 @@ var menu = []menuItem{
 		description: "Scan a golf scorecard.\nSend an image to Gemini OCR\nor load from a pre-scanned JSON.",
 		subItems: []subItem{
 			{
-				label:       "image",
-				prompt:      "Enter path to scorecard image:",
-				interactive: true,
-				fileInput:   true,
-				cmd:         []string{"python3", "scan.py", "image", "<input>"},
+				label:     "image",
+				prompt:    "Enter path to scorecard image:",
+				fileInput: true,
+				scanMode:  scanModeImage,
 			},
 			{
-				label:       "json",
-				prompt:      "Enter path to JSON file:",
-				interactive: true,
-				fileInput:   true,
-				cmd:         []string{"python3", "scan.py", "json", "<input>"},
+				label:     "json",
+				prompt:    "Enter path to JSON file:",
+				fileInput: true,
+				scanMode:  scanModeJSON,
 			},
 		},
 	},
@@ -138,6 +146,11 @@ type model struct {
 	height      int
 	completions []string
 	compIdx     int
+	// scorecard review
+	scorecard   *scorecardData
+	cursor      scCell
+	editingCell bool
+	editBuf     string
 }
 
 func initialModel() model {
@@ -161,6 +174,36 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+		return m, nil
+
+	case cmdParseScorecardMsg:
+		if msg.err != nil {
+			m.output = errorStyle.Render("Parse failed: "+msg.err.Error()) + "\n\n" + string(msg.output)
+			m.state = stateOutput
+			return m, nil
+		}
+		sc, err := parseScorecardJSON(msg.output)
+		if err != nil {
+			m.output = errorStyle.Render("Invalid JSON from parser: " + err.Error())
+			m.state = stateOutput
+			return m, nil
+		}
+		m.scorecard = sc
+		m.cursor = scCell{1, 0}
+		m.editingCell = false
+		m.state = stateScorecard
+		return m, nil
+
+	case scorecardParsedMsg:
+		if msg.err != nil {
+			m.output = errorStyle.Render("Failed to read file: " + msg.err.Error())
+			m.state = stateOutput
+			return m, nil
+		}
+		m.scorecard = msg.data
+		m.cursor = scCell{1, 0}
+		m.editingCell = false
+		m.state = stateScorecard
 		return m, nil
 
 	case cmdOutputMsg:
@@ -189,6 +232,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateSubMenu(msg)
 		case stateInput:
 			return m.updateInput(msg)
+		case stateScorecard:
+			return m.updateScorecard(msg)
 		case stateOutput:
 			m.state = stateMainMenu
 			m.output = ""
@@ -196,7 +241,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	default:
-		if m.state == stateInput {
+		if m.state == stateInput || (m.state == stateScorecard && m.editingCell && m.cursor.isNameCell()) {
 			var cmd tea.Cmd
 			m.input, cmd = m.input.Update(msg)
 			return m, cmd
@@ -287,6 +332,17 @@ func (m model) updateInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.input.Blur()
 		m.completions = nil
+
+		// Scan modes trigger the scorecard editor instead of a normal command
+		switch sub.scanMode {
+		case scanModeImage:
+			return m, runParseImage(val)
+		case scanModeJSON:
+			return m, func() tea.Msg {
+				data, err := readScorecardFile(val)
+				return scorecardParsedMsg{data: data, err: err}
+			}
+		}
 		return m.runSub(sub, val)
 
 	default:
@@ -355,16 +411,20 @@ func (m model) runSub(sub subItem, input string) (tea.Model, tea.Cmd) {
 // ── View ──────────────────────────────────────────────────────────────────────
 
 func (m model) View() string {
-	var ui string
 	switch m.state {
 	case stateMainMenu, stateSubMenu:
-		ui = m.viewMenu()
+		ui := m.viewMenu()
+		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, ui)
 	case stateInput:
-		ui = m.viewInput()
+		ui := m.viewInput()
+		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, ui)
 	case stateOutput:
-		ui = m.viewOutput()
+		ui := m.viewOutput()
+		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, ui)
+	case stateScorecard:
+		return m.viewScorecard()
 	}
-	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, ui)
+	return ""
 }
 
 func (m model) viewMenu() string {

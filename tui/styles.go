@@ -71,4 +71,9 @@ var (
 			Foreground(lipgloss.Color("#555555")).
 			PaddingLeft(2).
 			PaddingTop(1)
+
+	editingCellStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#000000")).
+				Background(lipgloss.Color("#81C784")).
+				Bold(true)
 )
