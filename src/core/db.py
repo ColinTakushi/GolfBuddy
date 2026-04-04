@@ -1,11 +1,8 @@
 """Database configuration and session management."""
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
-import os
 
-# Database file location
-DATABASE_DIR = os.path.join(os.path.dirname(__file__), "..", "..")
-DATABASE_URL = f"sqlite:///{DATABASE_DIR}/scorecard.db"
+from src.config import DATABASE_URL
 
 # Create engine
 engine = create_engine(

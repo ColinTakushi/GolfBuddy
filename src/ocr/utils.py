@@ -4,14 +4,29 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 from sqlalchemy.orm import Session
-from src.core.models import User, Course, Scorecard, Score
+from src.core.models import User, Course, Scorecard, Score, ScorecardImage
 
 
-def create_image_storage_dir(username: str) -> str:
-    """Create and return the image storage directory for a user."""
-    images_dir = os.path.join(os.path.dirname(__file__), "..", "..", "images", "users", username, "scorecards")
+def _image_storage_dir() -> str:
+    """Return the shared directory for stored scorecard images."""
+    images_dir = os.path.join(os.path.dirname(__file__), "..", "..", "images", "scorecards")
     Path(images_dir).mkdir(parents=True, exist_ok=True)
     return images_dir
+
+
+def save_image_to_db(db: Session, image_path: str) -> ScorecardImage:
+    """Copy the image to shared storage and create a ScorecardImage record."""
+    images_dir = _image_storage_dir()
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    ext = os.path.splitext(image_path)[1] or ".jpg"
+    filename = f"scorecard_{timestamp}{ext}"
+    dest_path = os.path.join(images_dir, filename)
+    shutil.copy2(image_path, dest_path)
+
+    image = ScorecardImage(path=dest_path)
+    db.add(image)
+    db.flush()
+    return image
 
 
 def save_scorecard_to_db(
@@ -20,7 +35,7 @@ def save_scorecard_to_db(
     course_name: str,
     scores: list,
     course_pars: list,
-    image_path: str = None,
+    image_id: int = None,
     raw_ocr_data: dict = None
 ) -> Scorecard:
     """
@@ -32,7 +47,7 @@ def save_scorecard_to_db(
         course_name: Name of the golf course
         scores: List of 18 scores (integers)
         course_pars: List of 18 par values (integers)
-        image_path: Optional path to the scorecard image
+        image_id: Optional ID of a ScorecardImage record shared across rounds
         raw_ocr_data: Optional raw extracted data for debugging
 
     Returns:
@@ -58,22 +73,12 @@ def save_scorecard_to_db(
         db.add(course)
         db.flush()
 
-    # Process image if provided
-    stored_image_path = None
-    if image_path and os.path.exists(image_path):
-        images_dir = create_image_storage_dir(username)
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"scorecard_{timestamp}.jpg"
-        dest_path = os.path.join(images_dir, filename)
-        shutil.copy2(image_path, dest_path)
-        stored_image_path = dest_path
-
     # Create scorecard
     scorecard = Scorecard(
         user_id=user.id,
         course_id=course.id,
+        image_id=image_id,
         date=datetime.now(),
-        image_path=stored_image_path,
         raw_ocr_data=raw_ocr_data,
     )
     db.add(scorecard)

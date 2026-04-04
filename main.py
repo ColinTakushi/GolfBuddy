@@ -20,6 +20,7 @@ def main():
         print("  python main.py stats <username>  # Show user statistics")
         print("  python main.py stats             # List all users")
         print("  python main.py migrate           # Migrate CSV data to database")
+        print("  python main.py nuke              # Deletes all data in database")
         return
     
     command = sys.argv[1].lower()
@@ -52,6 +53,21 @@ def main():
     elif command == "migrate":
         print("Migrating CSV data to database...")
         migrate_from_csv()
+    
+    elif command == "nuke":
+        from src.database.db import SessionLocal
+        from src.database.models import User, Course, Scorecard, Score, ScorecardImage
+        db = SessionLocal()
+        try:
+            db.query(Score).delete()
+            db.query(Scorecard).delete()
+            db.query(ScorecardImage).delete()
+            db.query(Course).delete()
+            db.query(User).delete()
+            db.commit()
+            print("Database cleared successfully.")
+        finally:
+            db.close()
     
     else:
         print(f"Unknown command: {command}")

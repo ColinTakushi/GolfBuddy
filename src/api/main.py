@@ -7,7 +7,7 @@ from typing import List, Optional
 from pydantic import BaseModel
 
 from src.database.db import init_db, get_db
-from src.database.models import User, Course, Scorecard, Score
+from src.database.models import User, Course, Scorecard, Score, ScorecardImage
 
 # Initialize database
 init_db()
@@ -35,7 +35,7 @@ class ScorecardResponse(BaseModel):
     user_id: int
     course_id: int
     date: datetime
-    image_path: Optional[str]
+    image_id: Optional[int]
     scores: List[ScoreResponse]
     total_score: int
     total_par: int
@@ -247,7 +247,7 @@ async def create_scorecard(
     username: str,
     course_id: int,
     scores: List[int],
-    image_path: Optional[str] = None,
+    image_id: Optional[int] = None,
     db: Session = Depends(get_db)
 ):
     """Create a new scorecard for a user."""
@@ -269,7 +269,7 @@ async def create_scorecard(
         user_id=user.id,
         course_id=course.id,
         date=datetime.now(),
-        image_path=image_path
+        image_id=image_id
     )
     db.add(scorecard)
     db.flush()
@@ -294,7 +294,7 @@ async def create_scorecard(
         "total_score": scorecard.get_total_score(),
         "total_par": scorecard.get_total_par(),
         "score_differential": scorecard.get_score_differential(),
-        "image_path": scorecard.image_path
+        "image_id": scorecard.image_id
     }
 
 
@@ -318,7 +318,7 @@ async def get_user_scorecards(username: str, db: Session = Depends(get_db)):
             "front_9": sc.get_front_9_score(),
             "back_9": sc.get_back_9_score(),
             "hole_breakdown": sc.get_hole_breakdown(),
-            "image_path": sc.image_path
+            "image_id": sc.image_id
         }
         for sc in scorecards
     ]
@@ -350,7 +350,7 @@ async def get_scorecard_detail(username: str, scorecard_id: int, db: Session = D
         "total_score": scorecard.get_total_score(),
         "total_par": scorecard.get_total_par(),
         "score_differential": scorecard.get_score_differential(),
-        "image_path": scorecard.image_path,
+        "image_id": scorecard.image_id,
         "holes": [
             {
                 "hole_number": s.hole_number,

@@ -50,21 +50,33 @@ class Course(Base):
         return f"<Course(id={self.id}, name='{self.name}')>"
 
 
+class ScorecardImage(Base):
+    """A single scorecard image that may be shared across multiple rounds."""
+    __tablename__ = "scorecard_images"
+
+    id = Column(Integer, primary_key=True, index=True)
+    path = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    scorecards = relationship("Scorecard", back_populates="image")
+
+
 class Scorecard(Base):
     """Scorecard representing one round of golf."""
     __tablename__ = "scorecards"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     course_id = Column(Integer, ForeignKey("courses.id"), nullable=False, index=True)
+    image_id = Column(Integer, ForeignKey("scorecard_images.id"), nullable=True)
     date = Column(DateTime, nullable=False)
-    image_path = Column(String, nullable=True)  # Path to the scorecard image file
     raw_ocr_data = Column(JSON, nullable=True)  # Raw OCR output for debugging
     created_at = Column(DateTime, default=datetime.utcnow)
-    
+
     # Relationships
     user = relationship("User", back_populates="scorecards")
     course = relationship("Course", back_populates="scorecards")
+    image = relationship("ScorecardImage", back_populates="scorecards")
     scores = relationship("Score", back_populates="scorecard", cascade="all, delete-orphan")
     
     def get_total_score(self):

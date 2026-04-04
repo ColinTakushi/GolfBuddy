@@ -1,6 +1,4 @@
 """Gemini-based pipeline: image → API → review → save → analyze."""
-import csv
-import io
 import json
 import mimetypes
 import os
@@ -10,7 +8,7 @@ import sys
 from google import genai
 from google.genai import types
 
-from src.ocr.utils import save_scorecard_to_db
+from src.ocr.utils import save_scorecard_to_db, save_image_to_db
 from src.core.db import SessionLocal
 from tools.analytics import print_user_breakdown
 
@@ -58,21 +56,6 @@ def _call_gemini(image_path: str) -> dict:
     raw = re.sub(r"^```(?:json)?\s*", "", raw)
     raw = re.sub(r"\s*```$", "", raw)
     return json.loads(raw)
-
-
-def _write_scan_csv(image_path: str, player_name: str, scores: list, pars: list, course_name: str) -> str:
-    """Write per-hole breakdown CSV next to the source image."""
-    base = os.path.splitext(image_path)[0]
-    safe_name = player_name.replace(" ", "_")
-    csv_path = f"{base}_{safe_name}_scan_result.csv"
-    with open(csv_path, "w", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow(["hole", "par", "score", "vs_par"])
-        for i, (par, score) in enumerate(zip(pars, scores), 1):
-            writer.writerow([i, par, score, score - par])
-        writer.writerow(["TOTAL", sum(pars), sum(scores), sum(scores) - sum(pars)])
-    print(f"  CSV saved: {csv_path}")
-    return csv_path
 
 
 def _prompt_18_values(label: str, prefill: list = None) -> list:
@@ -144,8 +127,7 @@ def scan_and_store(image_path: str) -> None:
       2. Parse structured JSON (course + players)
       3. User reviews and confirms/corrects each section
       4. Save one Scorecard per player to the database
-      5. Write per-player CSV
-      6. Print analytics per player
+      5. Print analytics per player
     """
     if not os.path.exists(image_path):
         print(f"Error: image not found: {image_path}")
@@ -160,9 +142,12 @@ def scan_and_store(image_path: str) -> None:
     # Step 2: Review course
     course = _review_course(data["course"])
 
-    # Step 3: Review and save each player
+    # Step 3: Store image once, then save each player's scorecard
     db = SessionLocal()
     try:
+        image = save_image_to_db(db, image_path)
+        print(f"\nImage stored (ID: {image.id})")
+
         for raw_player in data["players"]:
             player = _review_player(raw_player)
 
@@ -173,12 +158,11 @@ def scan_and_store(image_path: str) -> None:
                 course_name=course["name"],
                 scores=player["scores"],
                 course_pars=course["holePars"],
-                image_path=image_path,
+                image_id=image.id,
                 raw_ocr_data=data,
             )
             print(f"  Saved! Scorecard ID: {scorecard.id}")
 
-            _write_scan_csv(image_path, player["name"], player["scores"], course["holePars"], course["name"])
             print_user_breakdown(player["name"])
     finally:
         db.close()
