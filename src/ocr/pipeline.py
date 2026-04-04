@@ -10,7 +10,7 @@ from google.genai import types
 
 from src.ocr.utils import save_scorecard_to_db, save_image_to_db
 from src.core.db import SessionLocal
-from tools.analytics import print_user_breakdown
+from tools.analytics import print_user_breakdown, print_round_summary
 
 
 _PROMPT = """
@@ -200,8 +200,7 @@ def save_from_data(data: dict) -> None:
                 image_id=image_id,
                 raw_ocr_data=data,
             )
-            print(f"  Saved! Scorecard ID: {scorecard.id}")
-            print_user_breakdown(player["name"])
+            print_round_summary(scorecard)
     finally:
         db.close()
 

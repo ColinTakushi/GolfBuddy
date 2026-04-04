@@ -118,6 +118,24 @@ def print_user_breakdown(username: str):
         print()
 
 
+def print_round_summary(scorecard):
+    """Print stats for a single scorecard round."""
+    course = scorecard.course
+    total_score = scorecard.get_total_score()
+    total_par = scorecard.get_total_par()
+    differential = total_score - total_par
+    breakdown = scorecard.get_hole_breakdown()
+
+    print(f"\n{'='*50}")
+    print(f"ROUND SAVED: {scorecard.date.strftime('%Y-%m-%d')} at {course.name}")
+    print(f"{'='*50}")
+    print(f"  Total:   {total_score} (vs. {total_par} par)  {differential:+d}")
+    print(f"  Front 9: {scorecard.get_front_9_score()} (vs. {course.get_front_9_par()} par)")
+    print(f"  Back 9:  {scorecard.get_back_9_score()} (vs. {course.get_back_9_par()} par)")
+    print(f"  Birdies: {breakdown['birdies']}  Pars: {breakdown['pars']}  "
+          f"Bogeys: {breakdown['bogeys']}  Doubles+: {breakdown['doubles_plus']}")
+
+
 def print_all_users():
     """Print breakdown for all users."""
     db = SessionLocal()

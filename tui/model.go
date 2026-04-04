@@ -206,6 +206,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.state = stateScorecard
 		return m, nil
 
+	case scorecardSavedMsg:
+		if msg.err != nil {
+			m.output = errorStyle.Render("Save failed: "+msg.err.Error()) + "\n\n" + m.output
+		}
+		// on success, m.output already holds the formatted round summary
+		m.state = stateOutput
+		return m, nil
+
 	case cmdOutputMsg:
 		if msg.err != nil {
 			m.output = errorStyle.Render("Error: "+msg.err.Error()) + "\n\n" + msg.output

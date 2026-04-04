@@ -86,6 +86,10 @@ type cmdParseScorecardMsg struct {
 	err    error
 }
 
+// scorecardSavedMsg is returned after the save command completes.
+// On success we don't use the Python stdout — the summary was already formatted in Go.
+type scorecardSavedMsg struct{ err error }
+
 func runParseImage(imagePath string) tea.Cmd {
 	return func() tea.Msg {
 		var out bytes.Buffer
@@ -274,6 +278,88 @@ func (m *model) setScorecardCell(c scCell, val int) {
 	}
 }
 
+// formatRoundSummary builds box-drawing output for every player in the scorecard.
+func formatRoundSummary(sc *scorecardData) string {
+	const w = 66 // inner width between │ characters
+
+	top    := "┌" + strings.Repeat("─", w) + "┐"
+	mid    := "├" + strings.Repeat("─", w) + "┤"
+	bottom := "└" + strings.Repeat("─", w) + "┘"
+
+	line := func(s string) string {
+		return fmt.Sprintf("│ %-*s │", w-2, s)
+	}
+
+	parTotal := 0
+	parFront := 0
+	parBack  := 0
+	for i, p := range sc.HolePars {
+		parTotal += p
+		if i < 9 {
+			parFront += p
+		} else {
+			parBack += p
+		}
+	}
+
+	var parts []string
+	for _, p := range sc.Players {
+		scoreTotal := 0
+		scoreFront := 0
+		scoreBack  := 0
+		birdies, pars, bogeys, doubles := 0, 0, 0, 0
+
+		for i, s := range p.Scores {
+			scoreTotal += s
+			if i < 9 {
+				scoreFront += s
+			} else {
+				scoreBack += s
+			}
+			diff := s - sc.HolePars[i]
+			switch {
+			case diff < 0:
+				birdies++
+			case diff == 0:
+				pars++
+			case diff == 1:
+				bogeys++
+			default:
+				doubles++
+			}
+		}
+
+		diffTotal := scoreTotal - parTotal
+		diffFront := scoreFront - parFront
+		diffBack  := scoreBack  - parBack
+
+		sign := func(d int) string {
+			if d >= 0 {
+				return fmt.Sprintf("+%d", d)
+			}
+			return strconv.Itoa(d)
+		}
+
+		var sb strings.Builder
+		sb.WriteString(top + "\n")
+		sb.WriteString(line(fmt.Sprintf("PLAYER: %s", p.Name)) + "\n")
+		sb.WriteString(mid + "\n")
+		sb.WriteString(line(fmt.Sprintf("COURSE: %-40s PAR: %d", sc.CourseName, parTotal)) + "\n")
+		sb.WriteString(mid + "\n")
+		sb.WriteString(line(fmt.Sprintf(" TOTAL: %d  (vs. %d par)  [%s]", scoreTotal, parTotal, sign(diffTotal))) + "\n")
+		sb.WriteString(line(fmt.Sprintf(" FRONT: %d  (vs. %d par)  [%s]", scoreFront, parFront, sign(diffFront))) + "\n")
+		sb.WriteString(line(fmt.Sprintf(" BACK:  %d  (vs. %d par)  [%s]", scoreBack, parBack, sign(diffBack))) + "\n")
+		sb.WriteString(mid + "\n")
+		sb.WriteString(line(fmt.Sprintf(" Birdies: %d  │  Pars: %d  │  Bogeys: %d  │  Doubles+: %d",
+			birdies, pars, bogeys, doubles)) + "\n")
+		sb.WriteString(bottom)
+
+		parts = append(parts, sb.String())
+	}
+
+	return strings.Join(parts, "\n\n")
+}
+
 func (m model) saveScorecard() (tea.Model, tea.Cmd) {
 	sc := m.scorecard
 
@@ -314,17 +400,20 @@ func (m model) saveScorecard() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	summary := formatRoundSummary(sc)
 	m.scorecard = nil
-	m.output = "Saving scorecard..."
+	m.output = summary
 	m.state = stateOutput
 	return m, func() tea.Msg {
-		var out bytes.Buffer
+		var errOut bytes.Buffer
 		c := exec.Command("python3", "scan.py", "save", tmpPath)
 		c.Dir = projectRoot
-		c.Stdout = &out
-		c.Stderr = &out
+		c.Stderr = &errOut
 		runErr := c.Run()
-		return cmdOutputMsg{output: out.String(), err: runErr}
+		if runErr != nil {
+			return scorecardSavedMsg{err: fmt.Errorf("%w\n%s", runErr, errOut.String())}
+		}
+		return scorecardSavedMsg{}
 	}
 }
 
