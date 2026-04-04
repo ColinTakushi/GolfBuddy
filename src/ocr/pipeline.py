@@ -166,3 +166,52 @@ def scan_and_store(image_path: str) -> None:
             print_user_breakdown(player["name"])
     finally:
         db.close()
+
+
+def store_json(json_path: str) -> None:
+    """
+    Full pipeline:
+      1. Parse structured JSON (course + players)
+      3. User reviews and confirms/corrects each section
+      4. Save one Scorecard per player to the database
+      5. Print analytics per player
+    """
+    if not os.path.exists(json_path):
+        print(f"Error: json not found: {json_path}")
+        sys.exit(1)
+
+    # Step 1: extract JSON data
+    with open(json_path, 'r', encoding='utf-8') as file:
+      data = json.load(file)
+  
+    if not data:
+        print("FAILED TO EXTRACT JSON FROM {}", json_path)    
+        sys.exit(1)
+  
+    print("\n--- JSON EXTRACTED DATA ---")
+    print(json.dumps(data, indent=2))
+
+    # Step 2: Review course
+    course = _review_course(data["course"])
+
+    # Step 3: Store image once, then save each player's scorecard
+    db = SessionLocal()
+    try:
+
+        for raw_player in data["players"]:
+            player = _review_player(raw_player)
+
+            print(f"\nSaving scorecard for '{player['name']}' at '{course['name']}'...")
+            scorecard = save_scorecard_to_db(
+                db=db,
+                username=player["name"],
+                course_name=course["name"],
+                scores=player["scores"],
+                course_pars=course["holePars"],
+                raw_ocr_data=data,
+            )
+            print(f"  Saved! Scorecard ID: {scorecard.id}")
+
+            print_user_breakdown(player["name"])
+    finally:
+        db.close()

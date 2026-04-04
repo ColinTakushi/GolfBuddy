@@ -55,19 +55,15 @@ def main():
         migrate_from_csv()
     
     elif command == "nuke":
-        from src.database.db import SessionLocal
-        from src.database.models import User, Course, Scorecard, Score, ScorecardImage
-        db = SessionLocal()
-        try:
-            db.query(Score).delete()
-            db.query(Scorecard).delete()
-            db.query(ScorecardImage).delete()
-            db.query(Course).delete()
-            db.query(User).delete()
-            db.commit()
-            print("Database cleared successfully.")
-        finally:
-            db.close()
+        from src.config import DATABASE_DIR
+        from src.database.db import engine
+        from src.database.models import Base
+        db_path = DATABASE_DIR / "scorecard.db"
+        engine.dispose()
+        if db_path.exists():
+            db_path.unlink()
+        Base.metadata.create_all(bind=engine)
+        print("Database cleared and schema recreated successfully.")
     
     else:
         print(f"Unknown command: {command}")
