@@ -1,5 +1,20 @@
 # Quick Start Guide
 
+## TUI (recommended)
+
+Requires Go 1.21+. Run from the project root:
+
+```bash
+cd tui && go mod tidy && cd ..   # first time only
+go run ./tui
+```
+
+Navigate with ↑/↓, select with Enter, go back with Esc, quit with q.
+
+---
+
+## Direct CLI (advanced)
+
 ## Setup
 
 ```bash

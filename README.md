@@ -43,6 +43,38 @@ pip install -r requirements.txt
 
 ## Usage
 
+### TUI (recommended)
+
+#### Install Go
+
+**Linux (WSL/Ubuntu):**
+```bash
+sudo apt update && sudo apt install -y golang-go
+```
+
+**Or install the latest version manually:**
+```bash
+wget https://go.dev/dl/go1.23.0.linux-amd64.tar.gz
+sudo tar -C /usr/local -xzf go1.23.0.linux-amd64.tar.gz
+echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.zshrc
+source ~/.zshrc
+```
+
+#### Run
+
+From the project root:
+
+```bash
+cd tui && go mod tidy && cd ..   # first time only
+go run ./tui
+```
+
+Navigate with ↑/↓, select with Enter, go back with Esc, quit with q.
+
+---
+
+### CLI (direct)
+
 ### Scan a scorecard image
 
 ```bash

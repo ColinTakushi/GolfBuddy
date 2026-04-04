@@ -25,6 +25,11 @@ GolfBuddy/
 │       └── scorecard.db    # SQLite database
 ├── images/
 │   └── scorecards/         # Stored scorecard images (one per scan)
+├── tui/
+│   ├── go.mod              # Go module (bubbletea, bubbles, lipgloss)
+│   ├── main.go             # Entry point: tea.NewProgram(initialModel())
+│   ├── model.go            # Bubbletea model — all state, Update, View logic
+│   └── styles.go           # Lipgloss styles
 ├── docs/
 │   ├── DATABASE.md
 │   └── QUICKSTART.md
@@ -50,7 +55,14 @@ GolfBuddy/
 ### `tools/analytics.py`
 - `print_user_breakdown(username)` — formatted stats output
 
-## CLI Commands
+## Running the TUI
+
+```bash
+cd tui && go mod tidy && cd ..   # first time only
+go run ./tui                     # from project root
+```
+
+## CLI Commands (direct)
 
 ```bash
 python main.py api               # Start REST API server
