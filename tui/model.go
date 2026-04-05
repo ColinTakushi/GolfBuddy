@@ -31,8 +31,8 @@ const (
 	leftWidth  = 28
 	rightWidth = 99
 	// Total rendered width: leftWidth + 7 (border+padding+margin) + rightWidth + 6 (border+padding) = 140
-	titleContentWidth = leftWidth + rightWidth + 9  // = 136, renders to 140 with title padding
-	bodyContentWidth  = leftWidth + rightWidth + 7  // = 134, renders to 140 with panel border+padding
+	titleContentWidth = leftWidth + rightWidth + 9 // = 136, renders to 140 with title padding
+	bodyContentWidth  = leftWidth + rightWidth + 7 // = 134, renders to 140 with panel border+padding
 )
 
 // projectRoot is the GolfBuddy directory (parent of tui/).
@@ -150,7 +150,8 @@ type model struct {
 	rounds      []roundEntry
 	roundIdx    int
 	playerStats playerStatsData
-	roundID     int // DB scorecard ID for update; 0 = new
+	roundID     int // DB scorecard ID for update/delete; 0 = new
+	playerId    int
 }
 
 func initialModel() model {
@@ -255,6 +256,21 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.state = stateOutput
 		return m, nil
 
+
+	case roundDeletedMsg:
+		m.scorecard = nil
+		m.roundID = 0
+		m.editingCell = false
+		m.editBuf = ""
+		if msg.err != nil {
+			m.output = errorStyle.Render("Delete failed: " + msg.err.Error())
+			m.state = stateOutput
+			return m, nil
+		}
+		m.rounds = nil
+		m.players = nil
+		m.state = statePlayerDetail
+		return m, tea.Batch(cmdFetchRounds(m.playerName), cmdFetchPlayers())
 	case cmdOutputMsg:
 		if msg.err != nil {
 			m.output = errorStyle.Render("Error: "+msg.err.Error()) + "\n\n" + msg.output

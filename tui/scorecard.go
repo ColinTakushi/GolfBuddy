@@ -18,15 +18,17 @@ import (
 // ── Data types ────────────────────────────────────────────────────────────────
 
 type scorecardData struct {
-	CourseName string       `json:"courseName"`
-	HolePars   [18]int      `json:"holePars"`
-	Players    []playerData `json:"players"`
-	ImagePath  string       `json:"imagePath"`
+	CourseName   string       `json:"courseName"`
+	HolePars     [18]int      `json:"holePars"`
+	Players      []playerData `json:"players"`
+	ImagePath    string       `json:"imagePath"`
+	ScoreCardId  int 				`json:"id"`
 }
 
 type playerData struct {
 	Name   string  `json:"name"`
 	Scores [18]int `json:"scores"`
+	ID     int     `json:"id"`
 }
 
 // rawScorecardJSON mirrors the Gemini/pipeline JSON structure for parsing.
@@ -168,8 +170,10 @@ func (m model) updateConfirmDeleteNav(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.menuIdx++
 		}
 	case "enter":
-		//do stuff
-
+		if m.menuIdx == 0 { // Confirm
+			return m, cmdDeleteRound(m.roundID, m.playerId)
+		}
+		m.state = stateRoundView // Decline
 	}
 	return m, nil
 }

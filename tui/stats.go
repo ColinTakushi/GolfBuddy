@@ -11,8 +11,9 @@ import (
 // ── Data types ────────────────────────────────────────────────────────────────
 
 type playerEntry struct {
-	Name   string
-	Rounds int
+	Name     string
+	Rounds   int
+	PlayerID int
 }
 
 type roundEntry struct {
@@ -55,6 +56,10 @@ type roundSavedMsg struct {
 	err error
 }
 
+type roundDeletedMsg struct {
+	err error
+}
+
 // ── Update handlers ───────────────────────────────────────────────────────────
 
 func (m model) updatePlayerList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -78,6 +83,7 @@ func (m model) updatePlayerList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.playerName = m.players[m.playerIdx].Name
 		m.rounds = nil
 		m.state = statePlayerDetail
+		m.playerId = m.players[m.playerIdx].PlayerID
 		return m, cmdFetchRounds(m.playerName)
 	}
 	return m, nil
@@ -118,7 +124,7 @@ func (m model) updateRoundView(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// Intercept esc and s; delegate everything else to scorecard handlers
+	// Intercept esc, s, and d; delegate everything else to scorecard handlers
 	if !m.editingCell {
 		switch msg.String() {
 		case "ctrl+c":

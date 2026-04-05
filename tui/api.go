@@ -25,13 +25,14 @@ func cmdFetchPlayers() tea.Cmd {
 		var raw []struct {
 			Username        string `json:"username"`
 			ScorecardsCount int    `json:"scorecards_count"`
+			PlayerId				int    `json:"id"`
 		}
 		if err := json.Unmarshal(body, &raw); err != nil {
 			return playerListMsg{err: err}
 		}
 		players := make([]playerEntry, len(raw))
 		for i, u := range raw {
-			players[i] = playerEntry{Name: u.Username, Rounds: u.ScorecardsCount}
+			players[i] = playerEntry{Name: u.Username, Rounds: u.ScorecardsCount, PlayerID: u.PlayerId}
 		}
 		return playerListMsg{players: players}
 	}
@@ -39,7 +40,7 @@ func cmdFetchPlayers() tea.Cmd {
 
 func cmdFetchRounds(name string) tea.Cmd {
 	return func() tea.Msg {
-		resp, err := http.Get(apiBase + "/scorecards/" + name)
+		resp, err := http.Get(apiBase + "/" + name + "/scorecards")
 		if err != nil {
 			return roundListMsg{err: err}
 		}
@@ -111,13 +112,14 @@ func cmdFetchRoundDetail(name string, id int) tea.Cmd {
 		body, _ := io.ReadAll(resp.Body)
 
 		var raw struct {
-			ID     int    `json:"id"`
-			User   string `json:"user"`
-			Course string `json:"course"`
-			Holes  []struct {
-				HoleNumber int `json:"hole_number"`
-				Score      int `json:"score"`
-				Par        int `json:"par"`
+			ScorecardID     int    `json:"scorecardId"`
+			User            string `json:"user"`
+			Course          string `json:"course"`
+			UserID          int    `json:"uiserId"`
+			Holes           []struct {
+				HoleNumber      int `json:"hole_number"`
+				Score           int `json:"score"`
+				Par             int `json:"par"`
 			} `json:"holes"`
 		}
 		if err := json.Unmarshal(body, &raw); err != nil {
@@ -127,8 +129,14 @@ func cmdFetchRoundDetail(name string, id int) tea.Cmd {
 			return roundDetailMsg{err: fmt.Errorf("expected 18 holes, got %d", len(raw.Holes))}
 		}
 
-		sc := &scorecardData{CourseName: raw.Course}
-		pd := playerData{Name: raw.User}
+		sc := &scorecardData{
+			CourseName: raw.Course,
+			ScoreCardId: raw.ScorecardID,
+		}
+		pd := playerData{
+			Name: raw.User,
+			ID: raw.UserID,
+		}
 		for _, h := range raw.Holes {
 			i := h.HoleNumber - 1
 			if i >= 0 && i < 18 {
@@ -138,7 +146,7 @@ func cmdFetchRoundDetail(name string, id int) tea.Cmd {
 		}
 		sc.Players = []playerData{pd}
 
-		return roundDetailMsg{sc: sc, roundID: raw.ID}
+		return roundDetailMsg{sc: sc, roundID: raw.ScorecardID}
 	}
 }
 
@@ -213,5 +221,22 @@ func cmdNukeDatabase() tea.Cmd {
 			return cmdOutputMsg{err: fmt.Errorf("API error %d: %s", resp.StatusCode, body)}
 		}
 		return cmdOutputMsg{output: "Database cleared successfully."}
+	}
+}
+
+func cmdDeleteRound(scorecard_id int, user_id int) tea.Cmd {
+	return func() tea.Msg {
+		url := fmt.Sprintf("%s/scorecards/%d/%d", apiBase, scorecard_id, user_id)
+		req, _ := http.NewRequest(http.MethodDelete, url, nil)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return cmdOutputMsg{err: err}
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode >= 400 {
+			body, _ := io.ReadAll(resp.Body)
+			return cmdOutputMsg{err: fmt.Errorf("API error %d: %s", resp.StatusCode, body)}
+		}
+		return roundDeletedMsg{}
 	}
 }
