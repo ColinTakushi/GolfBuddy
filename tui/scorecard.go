@@ -18,15 +18,17 @@ import (
 // ── Data types ────────────────────────────────────────────────────────────────
 
 type scorecardData struct {
-	CourseName string       `json:"courseName"`
-	HolePars   [18]int      `json:"holePars"`
-	Players    []playerData `json:"players"`
-	ImagePath  string       `json:"imagePath"`
+	CourseName   string       `json:"courseName"`
+	HolePars     [18]int      `json:"holePars"`
+	Players      []playerData `json:"players"`
+	ImagePath    string       `json:"imagePath"`
+	ScoreCardId  int 				`json:"id"`
 }
 
 type playerData struct {
 	Name   string  `json:"name"`
 	Scores [18]int `json:"scores"`
+	ID     int     `json:"id"`
 }
 
 // rawScorecardJSON mirrors the Gemini/pipeline JSON structure for parsing.
@@ -153,10 +155,35 @@ func (m model) updateScorecard(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m.updateScorecardNav(msg)
 }
 
+func (m model) updateConfirmDeleteNav(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "ctrl+c":
+		return m, tea.Quit
+	case "q", "esc", "backspace":
+		m.state = stateRoundView
+	case "up", "k":
+		if m.menuIdx > 0 {
+			m.menuIdx--
+		}
+	case "down", "j":
+		if m.menuIdx < 1 {
+			m.menuIdx++
+		}
+	case "enter":
+		if m.menuIdx == 0 { // Confirm
+			return m, cmdDeleteRound(m.roundID, m.playerId)
+		}
+		m.state = stateRoundView // Decline
+	}
+	return m, nil
+}
+
 func (m model) updateScorecardNav(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "ctrl+c":
 		return m, tea.Quit
+	case "d":
+		m.state = stateConfirmDelete
 	case "q", "esc":
 		m.scorecard = nil
 		m.state = stateMainMenu
@@ -514,4 +541,40 @@ func renderCourseName(name string, m model, focused, editing bool) string {
 		return focusedCellStyle.Render(name)
 	}
 	return name
+}
+
+func (m model) viewDeleteConfirm() string {
+	const inner = statsPanelWidth - 2
+	var sb strings.Builder
+	line := func(s string) string { return "│" + padRight(s, inner) + "│" }
+
+	top := "┌" + strings.Repeat("─", inner) + "┐"
+	sb.WriteString(top + "\n")
+
+	sc := m.scorecard
+	sb.WriteString(line(errorStyle.Render("DELETE SCORE CARD")) + "\n")
+	bottom := "└" + strings.Repeat("─", inner) + "┘"
+
+	title := centerPad(fmt.Sprintf(" COURSE:  %s ", sc.CourseName), inner, '─')
+	sb.WriteString("├" + title + "┤\n")
+
+	options := []string{"Confirm", "Decline"}
+
+	for i, option := range options {
+		content := fmt.Sprintf("  %s", option)
+		if i == m.menuIdx {
+			content = selectedItemStyle.Render("> " + content[2:])
+			sb.WriteString("│" + padRight(content, inner) + "│\n")
+		} else {
+			sb.WriteString(line(content) + "\n")
+		}
+	}
+
+	sb.WriteString(line("") + "\n")
+	sb.WriteString(bottom)
+
+	help := helpStyle.Render("↑/↓  navigate    enter  select    esc  back   q  quit")
+	ui := lipgloss.JoinVertical(lipgloss.Left, sb.String(), help)
+	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, ui)
+
 }

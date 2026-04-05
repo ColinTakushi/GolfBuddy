@@ -11,8 +11,9 @@ import (
 // ── Data types ────────────────────────────────────────────────────────────────
 
 type playerEntry struct {
-	Name   string
-	Rounds int
+	Name     string
+	Rounds   int
+	PlayerID int
 }
 
 type roundEntry struct {
@@ -55,6 +56,10 @@ type roundSavedMsg struct {
 	err error
 }
 
+type roundDeletedMsg struct {
+	err error
+}
+
 // ── Update handlers ───────────────────────────────────────────────────────────
 
 func (m model) updatePlayerList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -78,6 +83,7 @@ func (m model) updatePlayerList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.playerName = m.players[m.playerIdx].Name
 		m.rounds = nil
 		m.state = statePlayerDetail
+		m.playerId = m.players[m.playerIdx].PlayerID
 		return m, cmdFetchRounds(m.playerName)
 	}
 	return m, nil
@@ -97,8 +103,6 @@ func (m model) updatePlayerDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.roundIdx < len(m.rounds)-1 {
 			m.roundIdx++
 		}
-	case "d":
-		fmt.Println("teting")
 	case "enter", "right", "l":
 		if len(m.rounds) == 0 {
 			break
@@ -120,7 +124,7 @@ func (m model) updateRoundView(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// Intercept esc and s; delegate everything else to scorecard handlers
+	// Intercept esc, s, and d; delegate everything else to scorecard handlers
 	if !m.editingCell {
 		switch msg.String() {
 		case "ctrl+c":
@@ -179,7 +183,7 @@ func (m model) viewPlayerList() string {
 			content := fmt.Sprintf("  %-*s %s", inner-12, p.Name, rounds)
 			if i == m.playerIdx {
 				content = selectedItemStyle.Render("> " + content[2:])
-				sb.WriteString("│" + fmt.Sprintf("%-*s", inner, content) + "│\n")
+				sb.WriteString("│" + padRight(content, inner) + "│\n")
 			} else {
 				sb.WriteString(line(content) + "\n")
 			}
@@ -235,7 +239,7 @@ func (m model) viewPlayerDetail() string {
 			}
 			content := fmt.Sprintf("  %-12s %-28s %5d  %s%d", r.Date, truncate(r.Course, 28), r.Score, sign, r.Diff)
 			if i == m.roundIdx {
-				sb.WriteString("│" + fmt.Sprintf("%-*s", inner, selectedItemStyle.Render("> "+content[2:])) + "│\n")
+				sb.WriteString("│" + padRight(selectedItemStyle.Render("> "+content[2:]), inner) + "│\n")
 			} else {
 				sb.WriteString(line(content) + "\n")
 			}
@@ -246,7 +250,7 @@ func (m model) viewPlayerDetail() string {
 	_ = top
 	sb.WriteString(bottom)
 
-	help := helpStyle.Render("↑/↓  navigate    enter  view round    esc  back   d  delete  q  quit")
+	help := helpStyle.Render("↑/↓  navigate    enter  view round    esc  back   q  quit")
 	ui := lipgloss.JoinVertical(lipgloss.Left, sb.String(), help)
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, ui)
 }
@@ -269,7 +273,7 @@ func (m model) viewRoundView() string {
 	if m.editingCell {
 		helpText = "enter/arrows  confirm    esc  cancel"
 	} else {
-		helpText = "↑/↓/←/→  navigate    e  edit    s  save    esc  back"
+		helpText = "↑/↓/←/→  navigate   e  edit   s  save   d  delete   esc  back"
 	}
 	help := helpStyle.Render(helpText)
 
@@ -278,6 +282,16 @@ func (m model) viewRoundView() string {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+// padRight pads s with spaces on the right to reach the given visual width.
+// Uses lipgloss.Width so ANSI escape codes are not counted.
+func padRight(s string, width int) string {
+	pad := width - lipgloss.Width(s)
+	if pad < 0 {
+		pad = 0
+	}
+	return s + strings.Repeat(" ", pad)
+}
 
 // centerPad centers text within width, padding with fill rune on both sides.
 func centerPad(s string, width int, fill rune) string {

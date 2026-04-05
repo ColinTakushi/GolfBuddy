@@ -21,9 +21,11 @@ class ScorecardPlayerBody(BaseModel):
     name: str
     scores: List[int]
 
+
 class ScorecardCourseBody(BaseModel):
     name: str
     holePars: List[int]
+
 
 class ScorecardBody(BaseModel):
     course: ScorecardCourseBody
@@ -70,7 +72,11 @@ async def list_users(db: Session = Depends(get_db)):
     """List all users."""
     users = db.query(User).all()
     return [
-        {"id": u.id, "username": u.username, "scorecards_count": len(u.scorecards)}
+        {
+            "id": u.id,
+            "username": u.username,
+            "scorecards_count": len(u.scorecards)
+        }
         for u in users
     ]
 
@@ -107,13 +113,46 @@ async def get_user(username: str, db: Session = Depends(get_db)):
     }
 
 
+@app.get("/{username}/scorecards")
+async def get_user_scorecards(username: str, db: Session = Depends(get_db)):
+    """Get all scorecards for a user, sorted newest first.
+
+    Returns summary info for each round: course, date, score vs par,
+    front/back 9 splits, hole breakdown, image path, and co-players.
+    """
+    user = db.query(User).filter(User.username == username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    scorecards = sorted(
+        user.scorecards, key=lambda sc: sc.date_played, reverse=True)
+
+    return [
+        {
+            "id": sc.id,
+            "course": sc.course.name,
+            "date_played": sc.date_played,
+            "total_score": sc.get_total_score(user.id),
+            "total_par": sc.total_par,
+            "score_differential": sc.get_score_differential(user.id),
+            "front_9": sc.get_front_9_score(user.id),
+            "back_9": sc.get_back_9_score(user.id),
+            "hole_breakdown": sc.get_hole_breakdown(user.id),
+            "image_path": sc.image_path,
+            "players": [u.username for u in sc.users],
+        }
+        for sc in scorecards
+    ]
+
 # ============ Courses ============
+
 
 @app.post("/courses")
 async def create_course(name: str, holes_par: List[int], db: Session = Depends(get_db)):
     """Create a new course (exactly 18 par values required)."""
     if len(holes_par) != 18:
-        raise HTTPException(status_code=400, detail="Must provide exactly 18 par values")
+        raise HTTPException(
+            status_code=400, detail="Must provide exactly 18 par values")
     if db.query(Course).filter(Course.name == name).first():
         raise HTTPException(status_code=400, detail="Course already exists")
 
@@ -179,15 +218,18 @@ async def get_course(course_id: int, db: Session = Depends(get_db)):
 async def create_scorecard(body: ScorecardBody, db: Session = Depends(get_db)):
     """Create one scorecard for a full round (all players)."""
     if len(body.course.holePars) != 18:
-        raise HTTPException(status_code=400, detail="Must provide exactly 18 par values")
+        raise HTTPException(
+            status_code=400, detail="Must provide exactly 18 par values")
     for p in body.players:
         if len(p.scores) != 18:
-            raise HTTPException(status_code=400, detail=f"Player {p.name}: must provide exactly 18 scores")
+            raise HTTPException(
+                status_code=400, detail=f"Player {p.name}: must provide exactly 18 scores")
 
     # Find or create course
     course = db.query(Course).filter(Course.name == body.course.name).first()
     if not course:
-        course = Course(name=body.course.name, hole_pars=body.course.holePars, total_par=sum(body.course.holePars))
+        course = Course(name=body.course.name, hole_pars=body.course.holePars,
+                        total_par=sum(body.course.holePars))
         db.add(course)
         db.flush()
 
@@ -226,37 +268,40 @@ async def create_scorecard(body: ScorecardBody, db: Session = Depends(get_db)):
         "date_played": scorecard.date_played,
         "total_par": scorecard.total_par,
         "players": [
-            {"username": u.username, "total_score": scorecard.get_total_score(u.id)}
+            {"username": u.username,
+                "total_score": scorecard.get_total_score(u.id)}
             for u, _ in user_objects
         ],
     }
 
 
-@app.get("/scorecards/{username}")
-async def get_user_scorecards(username: str, db: Session = Depends(get_db)):
-    """Get all rounds a user participated in, newest first."""
-    user = db.query(User).filter(User.username == username).first()
+@app.delete("/scorecards/{scorecard_id}/{user_id}")
+async def delete_scorecard_user(scorecard_id: int, user_id: int, db: Session = Depends(get_db)):
+    """Remove a user from a scorecard.
+
+    Removes the user from the scorecard's player list and deletes their scores.
+    If no players remain on the scorecard after removal, the scorecard itself is deleted.
+    """
+    user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail="User Id not found")
 
-    scorecards = sorted(user.scorecards, key=lambda sc: sc.date_played, reverse=True)
+    scorecard = db.query(Scorecard).filter(
+        Scorecard.id == scorecard_id).first()
+    if not scorecard or user not in scorecard.users:
+        raise HTTPException(status_code=404, detail="Scorecard not found")
 
-    return [
-        {
-            "id": sc.id,
-            "course": sc.course.name,
-            "date_played": sc.date_played,
-            "total_score": sc.get_total_score(user.id),
-            "total_par": sc.total_par,
-            "score_differential": sc.get_score_differential(user.id),
-            "front_9": sc.get_front_9_score(user.id),
-            "back_9": sc.get_back_9_score(user.id),
-            "hole_breakdown": sc.get_hole_breakdown(user.id),
-            "image_path": sc.image_path,
-            "players": [u.username for u in sc.users],
-        }
-        for sc in scorecards
-    ]
+    scorecard.users.remove(user)
+
+    updated_scores = dict(scorecard.scores)
+    updated_scores.pop(str(user_id), None)
+    scorecard.scores = updated_scores
+
+    if not scorecard.users:
+        db.delete(scorecard)
+
+    db.commit()
+    return {"message": "Scorecard removed from user history."}
 
 
 @app.get("/scorecards/{username}/{scorecard_id}")
@@ -266,15 +311,17 @@ async def get_scorecard_detail(username: str, scorecard_id: int, db: Session = D
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    scorecard = db.query(Scorecard).filter(Scorecard.id == scorecard_id).first()
+    scorecard = db.query(Scorecard).filter(
+        Scorecard.id == scorecard_id).first()
     if not scorecard or user not in scorecard.users:
         raise HTTPException(status_code=404, detail="Scorecard not found")
 
     user_scores = scorecard.scores.get(str(user.id), [])
 
     return {
-        "id": scorecard.id,
+        "scorecardId": scorecard.id,
         "user": user.username,
+        "userId": user.id,
         "course": scorecard.course.name,
         "date_played": scorecard.date_played,
         "total_score": scorecard.get_total_score(user.id),
@@ -303,6 +350,19 @@ async def get_scorecard_detail(username: str, scorecard_id: int, db: Session = D
     }
 
 
+@app.get("/scorecards/{scorecard_id}")
+async def get_score_card_from_id(scorecard_id: int, db: Session = Depends(get_db)):
+    """Get a scorecard by its ID."""
+
+    sc = db.query(Scorecard).filter(Scorecard.id == scorecard_id).first()
+    if not sc:
+        raise HTTPException(status_code=404, detail="Score card not found")
+
+    return {
+        "sc": sc
+    }
+
+
 @app.put("/scorecards/{scorecard_id}")
 async def update_scorecard_scores(
     scorecard_id: int,
@@ -312,7 +372,8 @@ async def update_scorecard_scores(
 ):
     """Replace a player's 18 hole scores for an existing round."""
     if len(scores) != 18:
-        raise HTTPException(status_code=400, detail="Must provide exactly 18 scores")
+        raise HTTPException(
+            status_code=400, detail="Must provide exactly 18 scores")
 
     user = db.query(User).filter(User.username == username).first()
     if not user:
@@ -352,7 +413,8 @@ async def get_user_stats(
     scorecards = sorted(scorecards, key=lambda sc: sc.date_played)
 
     if not scorecards:
-        raise HTTPException(status_code=404, detail="No scorecards found for this user")
+        raise HTTPException(
+            status_code=404, detail="No scorecards found for this user")
 
     scores = [sc.get_total_score(user.id) for sc in scorecards]
 
@@ -360,15 +422,18 @@ async def get_user_stats(
     for sc in scorecards:
         cname = sc.course.name
         if cname not in course_stats:
-            course_stats[cname] = {"rounds": 0, "total_score": 0, "best": None, "worst": None}
+            course_stats[cname] = {
+                "rounds": 0, "total_score": 0, "best": None, "worst": None}
         s = sc.get_total_score(user.id)
         course_stats[cname]["rounds"] += 1
         course_stats[cname]["total_score"] += s
         course_stats[cname]["best"] = min(s, course_stats[cname]["best"] or s)
-        course_stats[cname]["worst"] = max(s, course_stats[cname]["worst"] or s)
+        course_stats[cname]["worst"] = max(
+            s, course_stats[cname]["worst"] or s)
 
     for cname in course_stats:
-        course_stats[cname]["average"] = course_stats[cname]["total_score"] / course_stats[cname]["rounds"]
+        course_stats[cname]["average"] = course_stats[cname]["total_score"] / \
+            course_stats[cname]["rounds"]
 
     return {
         "username": username,
@@ -399,7 +464,8 @@ async def get_user_course_stats(username: str, course_id: int, db: Session = Dep
     )
 
     if not scorecards:
-        raise HTTPException(status_code=404, detail="No scorecards found for this user at this course")
+        raise HTTPException(
+            status_code=404, detail="No scorecards found for this user at this course")
 
     scores = [sc.get_total_score(user.id) for sc in scorecards]
     differentials = [sc.get_score_differential(user.id) for sc in scorecards]
