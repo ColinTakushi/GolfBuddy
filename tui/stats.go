@@ -97,6 +97,8 @@ func (m model) updatePlayerDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.roundIdx < len(m.rounds)-1 {
 			m.roundIdx++
 		}
+	case "d":
+		fmt.Println("teting")
 	case "enter", "right", "l":
 		if len(m.rounds) == 0 {
 			break
@@ -244,7 +246,7 @@ func (m model) viewPlayerDetail() string {
 	_ = top
 	sb.WriteString(bottom)
 
-	help := helpStyle.Render("↑/↓  navigate    enter  view round    esc  back")
+	help := helpStyle.Render("↑/↓  navigate    enter  view round    esc  back   d  delete  q  quit")
 	ui := lipgloss.JoinVertical(lipgloss.Left, sb.String(), help)
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, ui)
 }

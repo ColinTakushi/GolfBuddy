@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -48,7 +49,7 @@ func cmdFetchRounds(name string) tea.Cmd {
 		var rawRounds []struct {
 			ID                int    `json:"id"`
 			Course            string `json:"course"`
-			Date              string `json:"date"`
+			DatePlayed        string `json:"date_played"`
 			TotalScore        int    `json:"total_score"`
 			TotalPar          int    `json:"total_par"`
 			ScoreDifferential int    `json:"score_differential"`
@@ -58,7 +59,7 @@ func cmdFetchRounds(name string) tea.Cmd {
 		}
 		rounds := make([]roundEntry, len(rawRounds))
 		for i, r := range rawRounds {
-			date := r.Date
+			date := r.DatePlayed
 			if len(date) >= 10 {
 				date = date[:10]
 			}
@@ -183,8 +184,8 @@ func cmdUpdateRound(roundID int, sc *scorecardData) tea.Cmd {
 	return func() tea.Msg {
 		scores := sc.Players[0].Scores[:]
 		body, _ := json.Marshal(scores)
-		url := fmt.Sprintf("%s/scorecards/%d", apiBase, roundID)
-		req, _ := http.NewRequest(http.MethodPut, url, bytes.NewReader(body))
+		endpoint := fmt.Sprintf("%s/scorecards/%d?username=%s", apiBase, roundID, url.QueryEscape(sc.Players[0].Name))
+		req, _ := http.NewRequest(http.MethodPut, endpoint, bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
