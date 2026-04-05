@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -359,54 +357,11 @@ func formatRoundSummary(sc *scorecardData) string {
 
 func (m model) saveScorecard() (tea.Model, tea.Cmd) {
 	sc := m.scorecard
-
-	// Build save JSON
-	type savePlayer struct {
-		Name   string  `json:"name"`
-		Scores [18]int `json:"scores"`
-	}
-	type saveCourse struct {
-		Name     string  `json:"name"`
-		HolePars [18]int `json:"holePars"`
-	}
-	type savePayload struct {
-		Course    saveCourse   `json:"course"`
-		Players   []savePlayer `json:"players"`
-		ImagePath string       `json:"imagePath"`
-	}
-
-	payload := savePayload{
-		Course:    saveCourse{Name: sc.CourseName, HolePars: sc.HolePars},
-		ImagePath: sc.ImagePath,
-	}
-	for _, p := range sc.Players {
-		payload.Players = append(payload.Players, savePlayer{Name: p.Name, Scores: p.Scores})
-	}
-
-	raw, err := json.Marshal(payload)
-	if err != nil {
-		m.output = errorStyle.Render("Failed to encode scorecard: " + err.Error())
-		m.state = stateOutput
-		return m, nil
-	}
-
 	summary := formatRoundSummary(sc)
 	m.scorecard = nil
 	m.output = summary
 	m.state = stateOutput
-
-	return m, func() tea.Msg {
-		resp, err := http.Post(apiBase+"/scorecards", "application/json", bytes.NewBuffer(raw))
-		if err != nil {
-			return scorecardSavedMsg{err: err}
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode >= 400 {
-			body, _ := io.ReadAll(resp.Body)
-			return scorecardSavedMsg{err: fmt.Errorf("API error %d: %s", resp.StatusCode, body)}
-		}
-		return scorecardSavedMsg{}
-	}
+	return m, cmdSaveScorecard(sc)
 }
 
 // ── View ──────────────────────────────────────────────────────────────────────
