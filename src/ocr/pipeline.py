@@ -8,7 +8,7 @@ import sys
 from google import genai
 from google.genai import types
 
-from src.ocr.utils import save_scorecard_to_db, save_image_to_db
+from src.ocr.utils import save_scorecard_to_db
 from src.core.db import SessionLocal
 from tools.analytics import print_user_breakdown, print_round_summary
 
@@ -126,7 +126,7 @@ def scan_and_store(image_path: str) -> None:
       1. Send image to Gemini 2.5 Flash
       2. Parse structured JSON (course + players)
       3. User reviews and confirms/corrects each section
-      4. Save one Scorecard per player to the database
+      4. Save one Scorecard for all players to the database
       5. Print analytics per player
     """
     if not os.path.exists(image_path):
@@ -139,31 +139,27 @@ def scan_and_store(image_path: str) -> None:
     print("\n--- GEMINI EXTRACTED DATA ---")
     print(json.dumps(data, indent=2))
 
-    # Step 2: Review course
+    # Step 2: Review course and all players
     course = _review_course(data["course"])
+    reviewed_players = [_review_player(p) for p in data["players"]]
 
-    # Step 3: Store image once, then save each player's scorecard
+    # Step 3: Save one scorecard for the whole round
     db = SessionLocal()
     try:
-        image = save_image_to_db(db, image_path)
-        print(f"\nImage stored (ID: {image.id})")
+        print(f"\nSaving round at '{course['name']}' for {len(reviewed_players)} player(s)...")
+        scorecard = save_scorecard_to_db(
+            db=db,
+            course_name=course["name"],
+            course_pars=course["holePars"],
+            players=reviewed_players,
+            image_path=image_path,
+            raw_ocr_data=data,
+        )
+        print(f"  Saved! Scorecard ID: {scorecard.id}")
 
-        for raw_player in data["players"]:
-            player = _review_player(raw_player)
-
-            print(f"\nSaving scorecard for '{player['name']}' at '{course['name']}'...")
-            scorecard = save_scorecard_to_db(
-                db=db,
-                username=player["name"],
-                course_name=course["name"],
-                scores=player["scores"],
-                course_pars=course["holePars"],
-                image_id=image.id,
-                raw_ocr_data=data,
-            )
-            print(f"  Saved! Scorecard ID: {scorecard.id}")
-
-            print_user_breakdown(player["name"])
+        for user in scorecard.users:
+            print_round_summary(scorecard, user.id)
+            print_user_breakdown(user.username)
     finally:
         db.close()
 
@@ -183,24 +179,17 @@ def save_from_data(data: dict) -> None:
 
     db = SessionLocal()
     try:
-        image_id = None
-        if image_path and os.path.exists(image_path):
-            image = save_image_to_db(db, image_path)
-            image_id = image.id
-            print(f"Image stored (ID: {image_id})")
-
-        for player in players:
-            print(f"\nSaving scorecard for '{player['name']}' at '{course['name']}'...")
-            scorecard = save_scorecard_to_db(
-                db=db,
-                username=player["name"],
-                course_name=course["name"],
-                scores=player["scores"],
-                course_pars=course["holePars"],
-                image_id=image_id,
-                raw_ocr_data=data,
-            )
-            print_round_summary(scorecard)
+        print(f"\nSaving round at '{course['name']}' for {len(players)} player(s)...")
+        scorecard = save_scorecard_to_db(
+            db=db,
+            course_name=course["name"],
+            course_pars=course["holePars"],
+            players=players,
+            image_path=image_path if image_path and os.path.exists(image_path) else None,
+            raw_ocr_data=data,
+        )
+        for user in scorecard.users:
+            print_round_summary(scorecard, user.id)
     finally:
         db.close()
 
@@ -209,46 +198,40 @@ def store_json(json_path: str) -> None:
     """
     Full pipeline:
       1. Parse structured JSON (course + players)
-      3. User reviews and confirms/corrects each section
-      4. Save one Scorecard per player to the database
-      5. Print analytics per player
+      2. User reviews and confirms/corrects each section
+      3. Save one Scorecard for all players to the database
+      4. Print analytics per player
     """
     if not os.path.exists(json_path):
         print(f"Error: json not found: {json_path}")
         sys.exit(1)
 
-    # Step 1: extract JSON data
     with open(json_path, 'r', encoding='utf-8') as file:
-      data = json.load(file)
-  
+        data = json.load(file)
+
     if not data:
-        print("FAILED TO EXTRACT JSON FROM {}", json_path)    
+        print("FAILED TO EXTRACT JSON FROM {}", json_path)
         sys.exit(1)
-  
+
     print("\n--- JSON EXTRACTED DATA ---")
     print(json.dumps(data, indent=2))
 
-    # Step 2: Review course
     course = _review_course(data["course"])
+    reviewed_players = [_review_player(p) for p in data["players"]]
 
-    # Step 3: Store image once, then save each player's scorecard
     db = SessionLocal()
     try:
+        print(f"\nSaving round at '{course['name']}' for {len(reviewed_players)} player(s)...")
+        scorecard = save_scorecard_to_db(
+            db=db,
+            course_name=course["name"],
+            course_pars=course["holePars"],
+            players=reviewed_players,
+            raw_ocr_data=data,
+        )
+        print(f"  Saved! Scorecard ID: {scorecard.id}")
 
-        for raw_player in data["players"]:
-            player = _review_player(raw_player)
-
-            print(f"\nSaving scorecard for '{player['name']}' at '{course['name']}'...")
-            scorecard = save_scorecard_to_db(
-                db=db,
-                username=player["name"],
-                course_name=course["name"],
-                scores=player["scores"],
-                course_pars=course["holePars"],
-                raw_ocr_data=data,
-            )
-            print(f"  Saved! Scorecard ID: {scorecard.id}")
-
-            print_user_breakdown(player["name"])
+        for user in scorecard.users:
+            print_user_breakdown(user.username)
     finally:
         db.close()
