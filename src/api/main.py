@@ -372,6 +372,26 @@ async def get_scorecard_detail(username: str, scorecard_id: int, db: Session = D
     }
 
 
+@app.put("/scorecards/{scorecard_id}")
+async def update_scorecard_scores(
+    scorecard_id: int,
+    scores: List[int],
+    db: Session = Depends(get_db)
+):
+    """Replace all per-hole scores for an existing scorecard."""
+    if len(scores) != 18:
+        raise HTTPException(status_code=400, detail="Must provide exactly 18 scores")
+    sc = db.query(Scorecard).filter(Scorecard.id == scorecard_id).first()
+    if not sc:
+        raise HTTPException(status_code=404, detail="Scorecard not found")
+    db.query(Score).filter(Score.scorecard_id == scorecard_id).delete()
+    for i, s in enumerate(scores, 1):
+        db.add(Score(scorecard_id=scorecard_id, hole_number=i, score=s))
+    db.commit()
+    db.refresh(sc)
+    return {"id": sc.id, "total_score": sc.get_total_score()}
+
+
 # ============ Statistics ============
 
 @app.get("/stats/{username}")

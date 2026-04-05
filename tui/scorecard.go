@@ -421,13 +421,9 @@ func (m model) saveScorecard() (tea.Model, tea.Cmd) {
 
 const minScorecardWidth = 113
 
-func (m model) viewScorecard() string {
-	if m.width < minScorecardWidth {
-		msg := fmt.Sprintf("Terminal must be at least %d chars wide (current: %d). Please resize.", minScorecardWidth, m.width)
-		ui := errorStyle.Render(msg)
-		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, ui)
-	}
-
+// renderScorecardTable builds the box-drawing scorecard table string.
+// Shared by viewScorecard and viewRoundView.
+func (m model) renderScorecardTable() string {
 	sc := m.scorecard
 	var sb strings.Builder
 
@@ -462,7 +458,6 @@ func (m model) viewScorecard() string {
 		switch {
 		case isEditing(row, -1):
 			inp := m.input.View()
-			// trim/pad to fit
 			if len(inp) > width {
 				inp = inp[:width]
 			}
@@ -482,38 +477,20 @@ func (m model) viewScorecard() string {
 		return t
 	}
 
-	// ── Column widths ──
-	// label=8, holes=3 each, OUT/IN/TOT=5
-	// total: 1+8+1 + (3+1)*9 + 1+5+1 + (3+1)*9 + 1+5+1+5+1 = 102
-
 	parTotal := sum(sc.HolePars, 0, 18)
 	parFront := sum(sc.HolePars, 0, 9)
-	parBack := sum(sc.HolePars, 9, 18)
+	parBack  := sum(sc.HolePars, 9, 18)
 
-	// ── Top border + header ──
-	headerContent := fmt.Sprintf(" COURSE: %-*s PAR: %d ",
-		// pad course name to fill the line
-		100-len(" COURSE: ")-len(" PAR: ")-len(strconv.Itoa(parTotal))-2,
-		sc.CourseName, parTotal)
-	if isFocused(-1, -1) {
-		headerContent = selectedItemStyle.Render(fmt.Sprintf(" COURSE: %-*s PAR: %d ",
-			100-len(" COURSE: ")-len(" PAR: ")-len(strconv.Itoa(parTotal))-2,
-			sc.CourseName, parTotal))
-	} else if isEditing(-1, -1) {
-		inp := m.input.View()
-		headerContent = editingCellStyle.Render(fmt.Sprintf(" COURSE: %-s", inp))
-	}
-	_ = headerContent
-
-	topBorder := "┌" + strings.Repeat("─", 100) + "┐"
-	header := fmt.Sprintf("│ COURSE: %-*s PAR: %3d │",
+	topBorder    := "┌" + strings.Repeat("─", 100) + "┐"
+	header       := fmt.Sprintf("│ COURSE: %-*s PAR: %3d │",
 		80, renderCourseName(sc.CourseName, m, isFocused(-1, -1), isEditing(-1, -1)), parTotal)
-	colSep        := "├────────┬───┬───┬───┬───┬───┬───┬───┬───┬───╥─────┬───┬───┬───┬───┬───┬───┬───┬───┬───╥─────╥─────┤"
-	holeRow       := "│ HOLE   │ 1 │ 2 │ 3 │ 4 │ 5 │ 6 │ 7 │ 8 │ 9 ║ OUT │10 │11 │12 │13 │14 │15 │16 │17 │18 ║ IN  ║ TOT │"
-	holeSep       := "├────────┼───┼───┼───┼───┼───┼───┼───┼───┼───╫─────┼───┼───┼───┼───┼───┼───┼───┼───┼───╫─────╫─────┤"
-	parPlayerSep  := "╞════════╪═══╪═══╪═══╪═══╪═══╪═══╪═══╪═══╪═══╬═════╪═══╪═══╪═══╪═══╪═══╪═══╪═══╪═══╪═══╬═════╬═════╡"
+	colSep       := "├────────┬───┬───┬───┬───┬───┬───┬───┬───┬───╥─────┬───┬───┬───┬───┬───┬───┬───┬───┬───╥─────╥─────┤"
+	holeRow      := "│ HOLE   │ 1 │ 2 │ 3 │ 4 │ 5 │ 6 │ 7 │ 8 │ 9 ║ OUT │10 │11 │12 │13 │14 │15 │16 │17 │18 ║ IN  ║ TOT │"
+	holeSep      := "├────────┼───┼───┼───┼───┼───┼───┼───┼───┼───╫─────┼───┼───┼───┼───┼───┼───┼───┼───┼───╫─────╫─────┤"
+	parPlayerSep := "╞════════╪═══╪═══╪═══╪═══╪═══╪═══╪═══╪═══╪═══╬═════╪═══╪═══╪═══╪═══╪═══╪═══╪═══╪═══╪═══╬═════╬═════╡"
+	playerSep    := "├────────┼───┼───┼───┼───┼───┼───┼───┼───┼───╫─────┼───┼───┼───┼───┼───┼───┼───┼───┼───╫─────╫─────┤"
+	bottomBorder := "└────────┴───┴───┴───┴───┴───┴───┴───┴───┴───╨─────┴───┴───┴───┴───┴───┴───┴───┴───┴───╨─────╨─────┘"
 
-	// PAR row
 	parRow := fmt.Sprintf("│ %-6s │%s│%s│%s│%s│%s│%s│%s│%s│%s║%s│%s│%s│%s│%s│%s│%s│%s│%s│%s║%s║%s│",
 		"PAR",
 		renderNum(sc.HolePars[0], 3, 0, 0), renderNum(sc.HolePars[1], 3, 0, 1),
@@ -522,7 +499,7 @@ func (m model) viewScorecard() string {
 		renderNum(sc.HolePars[6], 3, 0, 6), renderNum(sc.HolePars[7], 3, 0, 7),
 		renderNum(sc.HolePars[8], 3, 0, 8),
 		fmt.Sprintf(" %3d ", parFront),
-		renderNum(sc.HolePars[9], 3, 0, 9), renderNum(sc.HolePars[10], 3, 0, 10),
+		renderNum(sc.HolePars[9], 3, 0, 9),   renderNum(sc.HolePars[10], 3, 0, 10),
 		renderNum(sc.HolePars[11], 3, 0, 11), renderNum(sc.HolePars[12], 3, 0, 12),
 		renderNum(sc.HolePars[13], 3, 0, 13), renderNum(sc.HolePars[14], 3, 0, 14),
 		renderNum(sc.HolePars[15], 3, 0, 15), renderNum(sc.HolePars[16], 3, 0, 16),
@@ -530,9 +507,6 @@ func (m model) viewScorecard() string {
 		fmt.Sprintf(" %3d ", parBack),
 		fmt.Sprintf(" %3d ", parTotal),
 	)
-
-	playerSep := "├────────┼───┼───┼───┼───┼───┼───┼───┼───┼───╫─────┼───┼───┼───┼───┼───┼───┼───┼───┼───╫─────╫─────┤"
-	bottomBorder := "└────────┴───┴───┴───┴───┴───┴───┴───┴───┴───╨─────┴───┴───┴───┴───┴───┴───┴───┴───┴───╨─────╨─────┘"
 
 	sb.WriteString(topBorder + "\n")
 	sb.WriteString(header + "\n")
@@ -544,19 +518,19 @@ func (m model) viewScorecard() string {
 
 	for pi, p := range sc.Players {
 		rowIdx := pi + 1
-		front := sum(p.Scores, 0, 9)
-		back := sum(p.Scores, 9, 18)
-		total := front + back
+		front  := sum(p.Scores, 0, 9)
+		back   := sum(p.Scores, 9, 18)
+		total  := front + back
 
 		row := fmt.Sprintf("│ %-6s │%s│%s│%s│%s│%s│%s│%s│%s│%s║%s│%s│%s│%s│%s│%s│%s│%s│%s│%s║%s║%s│",
 			renderName(p.Name, 6, rowIdx),
-			renderNum(p.Scores[0], 3, rowIdx, 0), renderNum(p.Scores[1], 3, rowIdx, 1),
-			renderNum(p.Scores[2], 3, rowIdx, 2), renderNum(p.Scores[3], 3, rowIdx, 3),
-			renderNum(p.Scores[4], 3, rowIdx, 4), renderNum(p.Scores[5], 3, rowIdx, 5),
-			renderNum(p.Scores[6], 3, rowIdx, 6), renderNum(p.Scores[7], 3, rowIdx, 7),
+			renderNum(p.Scores[0], 3, rowIdx, 0),   renderNum(p.Scores[1], 3, rowIdx, 1),
+			renderNum(p.Scores[2], 3, rowIdx, 2),   renderNum(p.Scores[3], 3, rowIdx, 3),
+			renderNum(p.Scores[4], 3, rowIdx, 4),   renderNum(p.Scores[5], 3, rowIdx, 5),
+			renderNum(p.Scores[6], 3, rowIdx, 6),   renderNum(p.Scores[7], 3, rowIdx, 7),
 			renderNum(p.Scores[8], 3, rowIdx, 8),
 			fmt.Sprintf(" %3d ", front),
-			renderNum(p.Scores[9], 3, rowIdx, 9), renderNum(p.Scores[10], 3, rowIdx, 10),
+			renderNum(p.Scores[9], 3, rowIdx, 9),   renderNum(p.Scores[10], 3, rowIdx, 10),
 			renderNum(p.Scores[11], 3, rowIdx, 11), renderNum(p.Scores[12], 3, rowIdx, 12),
 			renderNum(p.Scores[13], 3, rowIdx, 13), renderNum(p.Scores[14], 3, rowIdx, 14),
 			renderNum(p.Scores[15], 3, rowIdx, 15), renderNum(p.Scores[16], 3, rowIdx, 16),
@@ -569,12 +543,19 @@ func (m model) viewScorecard() string {
 			sb.WriteString(playerSep + "\n")
 		}
 	}
-	sb.WriteString(bottomBorder + "\n")
+	sb.WriteString(bottomBorder)
+	return sb.String()
+}
 
-	table := sb.String()
-	help := helpStyle.Render("↑/↓/←/→ navigate   enter edit   s save   esc cancel")
+func (m model) viewScorecard() string {
+	if m.width < minScorecardWidth {
+		msg := fmt.Sprintf("Terminal must be at least %d chars wide (current: %d). Please resize.", minScorecardWidth, m.width)
+		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, errorStyle.Render(msg))
+	}
 
-	ui := lipgloss.JoinVertical(lipgloss.Left, table, help)
+	table := m.renderScorecardTable()
+	help  := helpStyle.Render("↑/↓/←/→ navigate   enter edit   s save   esc cancel")
+	ui    := lipgloss.JoinVertical(lipgloss.Left, table, help)
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, ui)
 }
 

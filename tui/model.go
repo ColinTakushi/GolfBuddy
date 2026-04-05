@@ -21,6 +21,9 @@ const (
 	stateInput
 	stateOutput
 	stateScorecard
+	statePlayerList
+	statePlayerDetail
+	stateRoundView
 )
 
 const (
@@ -93,18 +96,7 @@ var menu = []menuItem{
 	},
 	{
 		label:       "stats",
-		description: "View player statistics.\nList all players or get a\ndetailed breakdown for one.",
-		subItems: []subItem{
-			{
-				label: "all players",
-				cmd:   []string{"python3", "main.py", "stats"},
-			},
-			{
-				label:  "by player",
-				prompt: "Enter player name:",
-				cmd:    []string{"python3", "main.py", "stats", "<input>"},
-			},
-		},
+		description: "Browse player statistics.\nSelect a player to view\nrounds and scorecards.",
 	},
 	{
 		label:       "nuke",
@@ -146,11 +138,19 @@ type model struct {
 	height      int
 	completions []string
 	compIdx     int
-	// scorecard review
+	// scorecard review (scan flow)
 	scorecard   *scorecardData
 	cursor      scCell
 	editingCell bool
 	editBuf     string
+	// stats browser
+	players     []playerEntry
+	playerIdx   int
+	playerName  string
+	rounds      []roundEntry
+	roundIdx    int
+	playerStats playerStatsData
+	roundID     int // DB scorecard ID for update; 0 = new
 }
 
 func initialModel() model {
@@ -214,6 +214,47 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.state = stateOutput
 		return m, nil
 
+	case playerListMsg:
+		if msg.err != nil {
+			m.output = errorStyle.Render("Failed to load players: " + msg.err.Error())
+			m.state = stateOutput
+			return m, nil
+		}
+		m.players = msg.players
+		m.playerIdx = 0
+		return m, nil
+
+	case roundListMsg:
+		if msg.err != nil {
+			m.output = errorStyle.Render("Failed to load rounds: " + msg.err.Error())
+			m.state = stateOutput
+			return m, nil
+		}
+		m.rounds = msg.rounds
+		m.playerStats = msg.stats
+		m.roundIdx = 0
+		return m, nil
+
+	case roundDetailMsg:
+		if msg.err != nil {
+			m.output = errorStyle.Render("Failed to load round: " + msg.err.Error())
+			m.state = stateOutput
+			return m, nil
+		}
+		m.scorecard = msg.sc
+		m.roundID = msg.roundID
+		m.cursor = scCell{1, 0}
+		m.editingCell = false
+		m.state = stateRoundView
+		return m, nil
+
+	case roundSavedMsg:
+		if msg.err != nil {
+			m.output = errorStyle.Render("Update failed: "+msg.err.Error()) + "\n\n" + m.output
+		}
+		m.state = stateOutput
+		return m, nil
+
 	case cmdOutputMsg:
 		if msg.err != nil {
 			m.output = errorStyle.Render("Error: "+msg.err.Error()) + "\n\n" + msg.output
@@ -242,6 +283,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateInput(msg)
 		case stateScorecard:
 			return m.updateScorecard(msg)
+		case statePlayerList:
+			return m.updatePlayerList(msg)
+		case statePlayerDetail:
+			return m.updatePlayerDetail(msg)
+		case stateRoundView:
+			return m.updateRoundView(msg)
 		case stateOutput:
 			m.state = stateMainMenu
 			m.output = ""
@@ -249,7 +296,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	default:
-		if m.state == stateInput || (m.state == stateScorecard && m.editingCell && m.cursor.isNameCell()) {
+		if m.state == stateInput ||
+			((m.state == stateScorecard || m.state == stateRoundView) && m.editingCell && m.cursor.isNameCell()) {
 			var cmd tea.Cmd
 			m.input, cmd = m.input.Update(msg)
 			return m, cmd
@@ -274,6 +322,12 @@ func (m model) updateMainMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		item := menu[m.menuIdx]
 		if item.label == "close" {
 			return m, tea.Quit
+		}
+		if item.label == "stats" {
+			m.players = nil
+			m.playerIdx = 0
+			m.state = statePlayerList
+			return m, cmdFetchPlayers()
 		}
 		m.subIdx = 0
 		m.state = stateSubMenu
@@ -431,6 +485,12 @@ func (m model) View() string {
 		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, ui)
 	case stateScorecard:
 		return m.viewScorecard()
+	case statePlayerList:
+		return m.viewPlayerList()
+	case statePlayerDetail:
+		return m.viewPlayerDetail()
+	case stateRoundView:
+		return m.viewRoundView()
 	}
 	return ""
 }
