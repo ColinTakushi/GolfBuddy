@@ -72,8 +72,15 @@ var (
 			PaddingLeft(2).
 			PaddingTop(1)
 
+	// focusedCellStyle highlights the entire cell background when navigating
+	focusedCellStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#000000")).
+				Background(lipgloss.Color("#4CAF50")).
+				Bold(true)
+
 	editingCellStyle = lipgloss.NewStyle().
 				Foreground(lipgloss.Color("#000000")).
-				Background(lipgloss.Color("#81C784")).
-				Bold(true)
+				Background(lipgloss.Color("#eb4034")).
+				Bold(true).
+				Blink(true)
 )

@@ -220,7 +220,7 @@ func (m model) updatePlayerList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "ctrl+c", "q":
 		return m, tea.Quit
-	case "esc":
+	case "esc", "backspace":
 		m.state = stateMainMenu
 	case "up", "k":
 		if m.playerIdx > 0 {
@@ -246,7 +246,7 @@ func (m model) updatePlayerDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "ctrl+c", "q":
 		return m, tea.Quit
-	case "esc", "left", "h":
+	case "esc", "left", "h", "backspace":
 		m.state = statePlayerList
 	case "up", "k":
 		if m.roundIdx > 0 {
@@ -282,7 +282,7 @@ func (m model) updateRoundView(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "ctrl+c":
 			return m, tea.Quit
-		case "q", "esc":
+		case "q", "esc", "backspace":
 			m.scorecard = nil
 			m.roundID = 0
 			m.editingCell = false

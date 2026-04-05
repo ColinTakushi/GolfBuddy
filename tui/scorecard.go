@@ -123,27 +123,22 @@ func moveCursor(cur scCell, dr, dc int, sc *scorecardData) scCell {
 	newCol := cur.col + dc
 	newRow := cur.row + dr
 
-	// col bounds: -1 (name) to 17 (hole 18)
+	// col bounds: -1 (name) to 17 (hole 18) — clamp, no wrap
 	if newCol < -1 {
-		newCol = 17
-	} else if newCol > 17 {
 		newCol = -1
+	} else if newCol > 17 {
+		newCol = 17
 	}
 
-	// row bounds: -1 (course name, only on name col) to maxR
-	if newRow < 0 {
-		newRow = maxR
+	// row bounds: clamp to 0..maxR normally; name col also allows -1
+	minRow := 0
+	if newCol == -1 {
+		minRow = -1 // course name row reachable on name column
+	}
+	if newRow < minRow {
+		newRow = minRow
 	} else if newRow > maxR {
-		newRow = 0
-	}
-
-	// course name row (-1) only reachable when on name column
-	if newRow == -1 && newCol != -1 {
 		newRow = maxR
-	}
-	// can't be on course name "number" cell
-	if cur.row == -1 && dc != 0 {
-		newRow = 0
 	}
 
 	return scCell{newRow, newCol}
@@ -447,7 +442,7 @@ func (m model) renderScorecardTable() string {
 			}
 			return editingCellStyle.Render(display)
 		case isFocused(row, col):
-			return selectedItemStyle.Render(s)
+			return focusedCellStyle.Render(s)
 		default:
 			return s
 		}
@@ -463,7 +458,7 @@ func (m model) renderScorecardTable() string {
 			}
 			return editingCellStyle.Render(fmt.Sprintf("%-*s", width, inp))
 		case isFocused(row, -1):
-			return selectedItemStyle.Render(s)
+			return focusedCellStyle.Render(s)
 		default:
 			return s
 		}
@@ -564,7 +559,7 @@ func renderCourseName(name string, m model, focused, editing bool) string {
 		return m.input.View()
 	}
 	if focused {
-		return selectedItemStyle.Render(name)
+		return focusedCellStyle.Render(name)
 	}
 	return name
 }

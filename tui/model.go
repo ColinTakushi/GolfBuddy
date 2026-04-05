@@ -340,7 +340,7 @@ func (m model) updateSubMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q", "ctrl+c":
 		return m, tea.Quit
-	case "esc", "left", "h":
+	case "esc", "left", "h", "backspace":
 		m.state = stateMainMenu
 	case "up", "k":
 		if m.subIdx > 0 {
@@ -382,6 +382,22 @@ func (m model) updateInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case "up":
+		if len(m.completions) > 0 {
+			m.compIdx = (m.compIdx - 1 + len(m.completions)) % len(m.completions)
+			m.input.SetValue(m.completions[m.compIdx])
+			m.input.CursorEnd()
+		}
+		return m, nil
+
+	case "down":
+		if len(m.completions) > 0 {
+			m.compIdx = (m.compIdx + 1) % len(m.completions)
+			m.input.SetValue(m.completions[m.compIdx])
+			m.input.CursorEnd()
+		}
+		return m, nil
+
 	case "enter":
 		val := strings.TrimSpace(m.input.Value())
 		item := menu[m.menuIdx]
@@ -408,7 +424,14 @@ func (m model) updateInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.runSub(sub, val)
 
 	default:
-		// Any non-tab key resets completions
+		// Backspace on empty input goes back
+		if msg.String() == "backspace" && m.input.Value() == "" {
+			m.input.Blur()
+			m.completions = nil
+			m.state = stateSubMenu
+			return m, nil
+		}
+		// Any non-navigation key resets completions
 		m.completions = nil
 		var cmd tea.Cmd
 		m.input, cmd = m.input.Update(msg)
@@ -529,7 +552,7 @@ func (m model) viewMenu() string {
 			rightLines = append(rightLines, dimStyle.Render("  "+sub.label))
 		}
 	}
-	rightPanel := infoPanelStyle.Width(rightWidth).Render(strings.Join(rightLines, "\n"))
+	rightPanel := infoPanelStyle.Width(rightWidth).Height(9).Render(strings.Join(rightLines, "\n"))
 
 	panels := lipgloss.JoinHorizontal(lipgloss.Top, leftPanel, rightPanel)
 	help := helpStyle.Render("↑/↓ navigate   enter select   esc back   q quit")
