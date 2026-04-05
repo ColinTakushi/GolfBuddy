@@ -194,6 +194,22 @@ func cmdFetchRoundDetail(name string, id int) tea.Cmd {
 	}
 }
 
+func cmdNukeDatabase() tea.Cmd {
+	return func() tea.Msg {
+		req, _ := http.NewRequest(http.MethodDelete, apiBase+"/nuke", nil)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return cmdOutputMsg{err: err}
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode >= 400 {
+			body, _ := io.ReadAll(resp.Body)
+			return cmdOutputMsg{err: fmt.Errorf("API error %d: %s", resp.StatusCode, body)}
+		}
+		return cmdOutputMsg{output: "Database cleared successfully."}
+	}
+}
+
 func cmdUpdateRound(roundID int, sc *scorecardData) tea.Cmd {
 	return func() tea.Msg {
 		scores := sc.Players[0].Scores[:]

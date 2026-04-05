@@ -105,7 +105,6 @@ var menu = []menuItem{
 			{
 				label:  "confirm",
 				prompt: `Type "yes" to confirm:`,
-				cmd:    []string{"python3", "main.py", "nuke"},
 			},
 		},
 	},
@@ -410,6 +409,10 @@ func (m model) updateInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.input.Blur()
 		m.completions = nil
+
+		if item.label == "nuke" {
+			return m, cmdNukeDatabase()
+		}
 
 		// Scan modes trigger the scorecard editor instead of a normal command
 		switch sub.scanMode {

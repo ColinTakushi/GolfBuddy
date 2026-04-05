@@ -107,6 +107,18 @@ async def root():
     return {"message": "Scorecard Tracking API", "version": "1.0"}
 
 
+@app.delete("/nuke")
+async def nuke_database(db: Session = Depends(get_db)):
+    """Delete all data from all tables."""
+    db.query(Score).delete()
+    db.query(Scorecard).delete()
+    db.query(ScorecardImage).delete()
+    db.query(User).delete()
+    db.query(Course).delete()
+    db.commit()
+    return {"message": "All data deleted."}
+
+
 # ============ Users ============
 
 @app.post("/users")
