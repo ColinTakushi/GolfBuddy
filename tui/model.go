@@ -24,6 +24,7 @@ const (
 	statePlayerList
 	statePlayerDetail
 	stateRoundView
+	stateConfirmDelete
 )
 
 const (
@@ -288,6 +289,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updatePlayerDetail(msg)
 		case stateRoundView:
 			return m.updateRoundView(msg)
+		case stateConfirmDelete:
+			return m.updateConfirmDeleteNav(msg)
 		case stateOutput:
 			m.state = stateMainMenu
 			m.output = ""
@@ -517,6 +520,8 @@ func (m model) View() string {
 		return m.viewPlayerDetail()
 	case stateRoundView:
 		return m.viewRoundView()
+	case stateConfirmDelete:
+		return m.viewDeleteConfirm()
 	}
 	return ""
 }
