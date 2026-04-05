@@ -1,24 +1,24 @@
-# Golf Scorecard Tracking System - Database
+# Database
 
 ## Overview
 
-- **SQLite** for persistent storage via SQLAlchemy ORM
-- **FastAPI** REST API for querying user progression and statistics
-- **Gemini 2.5 Flash** for OCR image processing
+- **SQLite** at `data/db/scorecard.db`
+- **SQLAlchemy ORM** — models in `src/core/models.py`
+- Database is created automatically on first run
 
-## Database Schema
+## Schema
 
 ### Users
 | Column | Type | Notes |
 |--------|------|-------|
-| id | Integer | Primary Key |
+| id | Integer | Primary key |
 | username | String | Unique |
 | created_at | DateTime | |
 
 ### Courses
 | Column | Type | Notes |
 |--------|------|-------|
-| id | Integer | Primary Key |
+| id | Integer | Primary key |
 | name | String | Unique |
 | holes_par | JSON | Array of 18 par values |
 | created_at | DateTime | |
@@ -26,8 +26,8 @@
 ### Scorecard Images
 | Column | Type | Notes |
 |--------|------|-------|
-| id | Integer | Primary Key |
-| path | String | Path to stored image file |
+| id | Integer | Primary key |
+| path | String | Path under `images/scorecards/` |
 | created_at | DateTime | |
 
 One image record is shared across all scorecards created from the same scan.
@@ -35,66 +35,60 @@ One image record is shared across all scorecards created from the same scan.
 ### Scorecards
 | Column | Type | Notes |
 |--------|------|-------|
-| id | Integer | Primary Key |
+| id | Integer | Primary key |
 | user_id | Integer | FK → Users |
 | course_id | Integer | FK → Courses |
 | image_id | Integer | FK → Scorecard Images (nullable) |
 | date | DateTime | When the round was played |
-| raw_ocr_data | JSON | Raw Gemini output |
+| raw_ocr_data | JSON | Raw Gemini output (nullable) |
 | created_at | DateTime | |
 
 ### Scores
 | Column | Type | Notes |
 |--------|------|-------|
-| id | Integer | Primary Key |
+| id | Integer | Primary key |
 | scorecard_id | Integer | FK → Scorecards |
 | hole_number | Integer | 1–18 |
 | score | Integer | Strokes for that hole |
 | created_at | DateTime | |
 
-## Setup
+## Scorecard Methods
 
-```bash
-python3 -m venv score_card_env
-source score_card_env/bin/activate
-pip install -r requirements.txt
-```
+`Scorecard` ORM objects expose these helper methods:
 
-The database is created automatically at `data/db/scorecard.db` on first run.
-
-## CLI Usage
-
-```bash
-python main.py api               # Start REST API server
-python main.py stats <username>  # Show stats for a user
-python main.py stats             # List all users
-python main.py migrate           # Import CSV data
-python main.py nuke              # Clear all data (testing)
-```
+| Method | Returns |
+|--------|---------|
+| `get_total_score()` | Sum of all 18 hole scores |
+| `get_total_par()` | Total par from the course |
+| `get_score_differential()` | `total_score - total_par` |
+| `get_front_9_score()` | Sum of holes 1–9 |
+| `get_back_9_score()` | Sum of holes 10–18 |
+| `get_hole_breakdown()` | Dict with counts of birdies, pars, bogeys, doubles+ |
 
 ## API Endpoints
 
 **Users**
-- `GET /users` — List all users
-- `POST /users?username=Colin` — Create a user
-- `GET /users/{username}` — User detail and stats
+- `GET /users` — list all users with round counts
+- `POST /users?username=Colin` — create a user
+- `GET /users/{username}` — user detail and aggregate stats
 
 **Courses**
-- `GET /courses` — List all courses
-- `POST /courses?name=...&holes_par=[...]` — Create a course
-- `GET /courses/{course_id}` — Course detail and stats
+- `GET /courses` — list all courses
+- `POST /courses?name=...&holes_par=[...]` — create a course
+- `GET /courses/{course_id}` — course detail
 
 **Scorecards**
-- `GET /scorecards/{username}` — All scorecards for a user
-- `GET /scorecards/{username}/{scorecard_id}` — Detailed scorecard with hole breakdown
-- `POST /scorecards` — Create a scorecard manually
+- `GET /scorecards/{username}` — all rounds for a user (newest first)
+- `GET /scorecards/{username}/{scorecard_id}` — full scorecard with per-hole breakdown
+- `POST /scorecards` — create a scorecard manually
+- `PUT /scorecards/{scorecard_id}` — replace all 18 hole scores for an existing round
 
 **Statistics**
-- `GET /stats/{username}` — Aggregated stats (total rounds, average, best/worst, trend)
-- `GET /stats/{username}?days=30` — Stats filtered to last N days
-- `GET /stats/{username}/course/{course_id}` — Course-specific stats
+- `GET /stats/{username}` — aggregated stats (total rounds, average, best/worst, trend, handicap estimate)
+- `GET /stats/{username}?days=30` — stats filtered to last N days
+- `GET /stats/{username}/course/{course_id}` — stats at a specific course
 
-Full interactive docs available at `http://localhost:8000/docs`.
+Full interactive docs: `http://localhost:8000/docs`
 
 ## Image Storage
 
@@ -103,16 +97,12 @@ Scorecard images are stored once per scan at:
 images/scorecards/scorecard_{timestamp}.jpg
 ```
 
-All scorecards (one per player) from the same scan share the same `image_id`.
+All player scorecards from the same scan share a single `image_id`.
 
-## Troubleshooting
+## Reset the Database
 
-### API port already in use
-```bash
-lsof -ti:8000 | xargs kill -9
-```
-
-### Reset the database
 ```bash
 python main.py nuke
 ```
+
+Deletes `data/db/scorecard.db` and recreates the schema from scratch.

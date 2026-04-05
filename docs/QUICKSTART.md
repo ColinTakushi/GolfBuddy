@@ -1,19 +1,10 @@
-# Quick Start Guide
+# Quick Start
 
-## TUI (recommended)
+## Prerequisites
 
-Requires Go 1.21+. Run from the project root:
-
-```bash
-cd tui && go mod tidy && cd ..   # first time only
-go run ./tui
-```
-
-Navigate with ↑/↓, select with Enter, go back with Esc, quit with q.
-
----
-
-## Direct CLI (advanced)
+- Python 3.12+
+- Go 1.21+
+- `GEMINI_API_KEY` environment variable
 
 ## Setup
 
@@ -24,32 +15,49 @@ pip install -r requirements.txt
 export GEMINI_API_KEY=<your_key>
 ```
 
-## Scan a Scorecard Image
+## Run the TUI
 
 ```bash
-python main.py scan golf.jpg
+cd tui
+go mod tidy   # first time only
+go run .
 ```
 
-Sends the image to Gemini 2.5 Flash, displays extracted course and player data, walks you through confirming or correcting each section, then saves one scorecard per player to the database.
+The REST API starts automatically in the background. Navigate with `↑/↓`, select with `Enter`, go back with `Esc`.
 
-## Stats (Command Line)
+---
+
+## TUI Flows
+
+### Scan → Review → Save
+
+1. Select **scan → image**, enter the image path
+2. Gemini extracts the scorecard; the table editor opens
+3. Navigate cells with arrow keys, press `e` or `Enter` to edit a value, digits to type, `Enter`/arrow to confirm
+4. Press `s` to save — one scorecard per player is written to the database
+
+To skip Gemini (testing): **scan → json**, enter a path to a pre-parsed JSON file.
+
+### Stats Browser
+
+1. Select **stats** — a list of all players loads
+2. Select a player to see their aggregate stats and round history
+3. Select a round to view its full scorecard
+4. Press `e` to edit scores, `s` to save changes back to the database
+5. `Esc` returns to the previous screen
+
+---
+
+## REST API (manual)
 
 ```bash
-python main.py stats            # list all users
-python main.py stats Colin      # stats for a specific user
-```
-
-## REST API
-
-```bash
-python main.py api              # starts on http://localhost:8000
+python main.py api   # starts on http://localhost:8000
 ```
 
 ```bash
 # Users
 curl http://localhost:8000/users
 curl http://localhost:8000/users/Colin
-curl -X POST "http://localhost:8000/users?username=JohnDoe"
 
 # Scorecards
 curl http://localhost:8000/scorecards/Colin
@@ -58,36 +66,44 @@ curl http://localhost:8000/scorecards/Colin/3
 # Stats
 curl http://localhost:8000/stats/Colin
 curl "http://localhost:8000/stats/Colin?days=30"
-curl http://localhost:8000/stats/Colin/course/1
 
-# Courses
-curl http://localhost:8000/courses
-curl -X POST "http://localhost:8000/courses?name=MyGolfCourse&holes_par=[4,4,4,3,4,5,3,4,4,4,4,4,3,4,4,3,4,5]"
+# Update scores for a round
+curl -X PUT http://localhost:8000/scorecards/3 \
+  -H "Content-Type: application/json" \
+  -d '[4,3,5,4,4,4,4,3,5,4,4,4,3,4,5,4,4,4]'
 ```
 
-Interactive API docs: `http://localhost:8000/docs`
+Interactive docs: `http://localhost:8000/docs`
 
-## Reset Database (Testing)
+---
+
+## CLI (direct)
 
 ```bash
-python main.py nuke
+python main.py stats             # list all users
+python main.py stats Colin       # stats for a specific user
+python main.py nuke              # delete all data and recreate schema
 ```
+
+---
 
 ## File Locations
 
 | Item | Location |
 |------|----------|
 | Database | `data/db/scorecard.db` |
-| Scorecard Images | `images/scorecards/` |
-| Models | `src/core/models.py` |
-| API Server | `src/api/server.py` |
+| Scorecard images | `images/scorecards/` |
+| ORM models | `src/core/models.py` |
+| API server | `src/api/server.py` |
 
 ## Troubleshooting
 
-### "User not found"
-Check spelling — query `/users` to see available users.
-
-### API port 8000 already in use
+**API port 8000 already in use**
 ```bash
 lsof -ti:8000 | xargs kill -9
+```
+
+**Reset the database**
+```bash
+python main.py nuke
 ```

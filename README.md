@@ -1,118 +1,114 @@
-# Golf Scorecard Reader
+# GolfBuddy
 
-A Python application that reads golf scorecards from images using Gemini 2.5 Flash, stores round data in a SQLite database, and exposes a REST API for querying stats.
+A golf scorecard tracking app with a terminal UI. Scan scorecards via Gemini OCR, browse player stats, view and edit rounds — all from the terminal.
 
 ## Features
 
-- Scorecard image reading via Gemini 2.5 Flash API (multi-player support)
-- SQLite database for storing users, courses, scorecards, and hole-by-hole scores
-- REST API built with FastAPI
-- CLI tools for stats
+- Scorecard scanning via Gemini 2.5 Flash (multi-player support)
+- Interactive TUI: scan, review, edit, and save scorecards without leaving the terminal
+- Stats browser: browse players, view round history, open any round's scorecard
+- SQLite database via SQLAlchemy
+- REST API (FastAPI) started automatically in the background
 
-## Project Structure
-
-```
-score-card-reader/
-├── src/
-│   ├── core/           # Database engine and SQLAlchemy models
-│   ├── api/            # FastAPI application and endpoints
-│   ├── ocr/            # Gemini pipeline and DB save utilities
-│   └── analysis/       # Statistics and analytics
-├── tools/
-│   └── analytics.py    # CLI analytics tool
-├── scan.py             # Scan a scorecard image (main entry point)
-├── analyze.py          # Run stats from the command line
-├── server.py           # Start the API server
-└── requirements.txt
-```
-
-## Setup
+## Quick Start
 
 ### Prerequisites
 
 - Python 3.12+
-- A Gemini API key — set it as `GEMINI_API_KEY` in your environment
+- Go 1.21+
+- `GEMINI_API_KEY` environment variable set
 
 ### Install dependencies
 
 ```bash
 python3 -m venv score_card_env
-source score_card_env/bin/activate  # Windows: score_card_env\Scripts\activate
+source score_card_env/bin/activate   # Windows: score_card_env\Scripts\activate
 pip install -r requirements.txt
 ```
 
-## Usage
+### Run the TUI
 
-### TUI (recommended)
-
-#### Install Go
-
-**Linux (WSL/Ubuntu):**
 ```bash
-sudo apt update && sudo apt install -y golang-go
+cd tui
+go mod tidy   # first time only
+go run .
 ```
 
-**Or install the latest version manually:**
-```bash
-wget https://go.dev/dl/go1.23.0.linux-amd64.tar.gz
-sudo tar -C /usr/local -xzf go1.23.0.linux-amd64.tar.gz
-echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.zshrc
-source ~/.zshrc
+The API server starts automatically in the background when the TUI launches.
+
+## TUI Navigation
+
+| Key | Action |
+|-----|--------|
+| `↑/↓` or `j/k` | Navigate lists and menus |
+| `Enter` | Select / confirm |
+| `Esc` | Go back |
+| `q` | Quit (from most screens) |
+| `e` | Enter edit mode (scorecard cells) |
+| `s` | Save scorecard |
+| `Tab` | Autocomplete file path (input screen) |
+
+## TUI Menu
+
+### scan
+Scan a scorecard from an image or a pre-parsed JSON file.
+
+- **image** — send image to Gemini, review the extracted scorecard in the TUI table editor, then save
+- **json** — load a pre-parsed JSON file directly into the table editor (useful for testing without hitting Gemini)
+
+After scanning, the scorecard table lets you navigate cells with arrow keys, edit any value, and press `s` to save.
+
+### stats
+Browse all players. Select a player to see their round history and aggregate stats. Select a round to view its full scorecard. Press `e` to edit scores and `s` to save changes back to the database.
+
+### nuke
+Delete all data and recreate the database schema. Requires typing `yes` to confirm.
+
+## Project Structure
+
 ```
-
-#### Run
-
-From the project root:
-
-```bash
-cd tui && go mod tidy && cd ..   # first time only
-go run ./tui
-```
-
-Navigate with ↑/↓, select with Enter, go back with Esc, quit with q.
-
----
-
-### CLI (direct)
-
-### Scan a scorecard image
-
-```bash
-GEMINI_API_KEY=<your_key> python3 scan.py golf.jpg
-```
-
-The pipeline sends the image to Gemini 2.5 Flash, displays the extracted course and player data as JSON, then walks you through confirming or correcting each section before saving to the database. One scorecard record is saved per player.
-
-### Start the API server
-
-```bash
-python server.py           # runs on port 8000
-python server.py 8080      # custom port
-```
-
-API docs available at `http://localhost:8000/docs`
-
-### View player stats
-
-```bash
-python analyze.py Colin        # stats for a specific user
-python analyze.py              # list all users
+GolfBuddy/
+├── src/
+│   ├── core/           # SQLAlchemy engine and ORM models
+│   ├── database/       # CLI-facing mirrors of src/core/ (same DB)
+│   ├── api/            # FastAPI application (server.py used at runtime)
+│   └── ocr/            # Gemini pipeline and DB save utilities
+├── tools/
+│   └── analytics.py    # Round summary formatting
+├── tui/
+│   ├── main.go         # Entry point — starts API server + TUI
+│   ├── model.go        # Bubbletea model, state machine, menus
+│   ├── scorecard.go    # Scorecard table editor (scan flow)
+│   ├── stats.go        # Stats browser (player list, round view)
+│   └── styles.go       # Lipgloss styles
+├── scan.py             # Python CLI for scanning scorecards
+├── main.py             # Python CLI entry point (api / stats / nuke)
+└── requirements.txt
 ```
 
 ## API Endpoints
 
+The API starts automatically when the TUI runs. It can also be started manually:
+
+```bash
+python main.py api   # http://localhost:8000
+```
+
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/users` | List all users |
-| GET | `/courses` | List all courses |
-| GET | `/scorecards/{username}` | List scorecards for a user |
-| GET | `/stats/{username}` | Aggregated statistics |
+| GET | `/users/{username}` | User detail and aggregate stats |
+| GET | `/scorecards/{username}` | All rounds for a user |
+| GET | `/scorecards/{username}/{id}` | Full scorecard with per-hole breakdown |
+| PUT | `/scorecards/{id}` | Update scores for an existing round |
+| GET | `/stats/{username}` | Aggregated stats (avg, best, worst, handicap) |
+| GET | `/stats/{username}?days=N` | Stats filtered to last N days |
 
-Full docs available via Swagger UI at `/docs` when the server is running.
+Interactive docs: `http://localhost:8000/docs`
 
 ## Tech Stack
 
-- **Image reading**: Gemini 2.5 Flash (`google-genai`)
+- **OCR**: Gemini 2.5 Flash (`google-genai`)
 - **API**: FastAPI, Uvicorn
 - **Database**: SQLite via SQLAlchemy
-- **Data**: Pandas, NumPy
+- **TUI**: Go, Bubbletea, Lipgloss
