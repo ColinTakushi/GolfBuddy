@@ -240,60 +240,67 @@ async def get_course(course_id: int, db: Session = Depends(get_db)):
 
 # ============ Scorecards ============
 
+class ScorecardPlayerBody(BaseModel):
+    name: str
+    scores: List[int]
+
+class ScorecardCourseBody(BaseModel):
+    name: str
+    holePars: List[int]
+
+class ScorecardBody(BaseModel):
+    course: ScorecardCourseBody
+    players: List[ScorecardPlayerBody]
+    imagePath: Optional[str] = None
+
+
 @app.post("/scorecards")
-async def create_scorecard(
-    username: str,
-    course_id: int,
-    scores: List[int],
-    image_id: Optional[int] = None,
-    db: Session = Depends(get_db)
-):
-    """Create a new scorecard for a user."""
-    if len(scores) != 18:
-        raise HTTPException(status_code=400, detail="Must provide exactly 18 scores")
-    
-    # Find user
-    user = db.query(User).filter(User.username == username).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    # Find course
-    course = db.query(Course).filter(Course.id == course_id).first()
+async def create_scorecard(body: ScorecardBody, db: Session = Depends(get_db)):
+    """Create scorecards for all players from a scanned round."""
+    if len(body.course.holePars) != 18:
+        raise HTTPException(status_code=400, detail="Must provide exactly 18 par values")
+    for p in body.players:
+        if len(p.scores) != 18:
+            raise HTTPException(status_code=400, detail=f"Player {p.name}: must provide exactly 18 scores")
+
+    # Find or create course
+    course = db.query(Course).filter(Course.name == body.course.name).first()
     if not course:
-        raise HTTPException(status_code=404, detail="Course not found")
-    
-    # Create scorecard
-    scorecard = Scorecard(
-        user_id=user.id,
-        course_id=course.id,
-        date=datetime.now(),
-        image_id=image_id
-    )
-    db.add(scorecard)
-    db.flush()
-    
-    # Add individual scores
-    for hole_num, score in enumerate(scores, start=1):
-        score_obj = Score(
-            scorecard_id=scorecard.id,
-            hole_number=hole_num,
-            score=score
+        course = Course(name=body.course.name, holes_par=body.course.holePars)
+        db.add(course)
+        db.flush()
+
+    created = []
+    for p in body.players:
+        # Find or create user
+        user = db.query(User).filter(User.username == p.name).first()
+        if not user:
+            user = User(username=p.name)
+            db.add(user)
+            db.flush()
+
+        scorecard = Scorecard(
+            user_id=user.id,
+            course_id=course.id,
+            date=datetime.now(),
         )
-        db.add(score_obj)
-    
+        db.add(scorecard)
+        db.flush()
+
+        for hole_num, score in enumerate(p.scores, start=1):
+            db.add(Score(scorecard_id=scorecard.id, hole_number=hole_num, score=score))
+
+        db.flush()
+        db.refresh(scorecard)
+        created.append({
+            "id": scorecard.id,
+            "username": user.username,
+            "course": course.name,
+            "total_score": scorecard.get_total_score(),
+        })
+
     db.commit()
-    db.refresh(scorecard)
-    
-    return {
-        "id": scorecard.id,
-        "user_id": scorecard.user_id,
-        "course_id": scorecard.course_id,
-        "date": scorecard.date,
-        "total_score": scorecard.get_total_score(),
-        "total_par": scorecard.get_total_par(),
-        "score_differential": scorecard.get_score_differential(),
-        "image_id": scorecard.image_id
-    }
+    return {"scorecards": created}
 
 
 @app.get("/scorecards/{username}")
