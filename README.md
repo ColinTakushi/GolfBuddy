@@ -21,8 +21,8 @@ A golf scorecard tracking app with a terminal UI. Scan scorecards via Gemini OCR
 ### Install dependencies
 
 ```bash
-python3 -m venv score_card_env
-source score_card_env/bin/activate   # Windows: score_card_env\Scripts\activate
+python3 -m venv golf_buddy_env
+source golf_buddy_env/bin/activate
 pip install -r requirements.txt
 ```
 

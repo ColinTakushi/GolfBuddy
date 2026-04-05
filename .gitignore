@@ -1,4 +1,5 @@
 score_card_env/
+golf_buddy/
 __pycache__/
 *.pyc
 *.db

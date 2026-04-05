@@ -6,7 +6,7 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from src.api.main import app
+from src.api.server import app
 from src.analysis.stats import print_user_breakdown, print_all_users
 from src.database.migrate import migrate_from_csv
 

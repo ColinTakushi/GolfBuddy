@@ -1,14 +1,15 @@
-"""FastAPI backend for scorecard data access."""
+"""FastAPI backend for scorecard tracking system."""
 from fastapi import FastAPI, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
 from datetime import datetime, timedelta
 from typing import List, Optional
-import os
 from pydantic import BaseModel
+from contextlib import asynccontextmanager
 
-from src.core.db import SessionLocal, init_db, get_db
-from src.core.models import User, Course, Scorecard, Score, ScorecardImage
+
+from src.database.db import init_db, get_db
+from src.database.models import User, Course, Scorecard, Score, ScorecardImage
 
 # Initialize database
 init_db()
@@ -265,7 +266,7 @@ async def create_scorecard(
     scorecard = Scorecard(
         user_id=user.id,
         course_id=course.id,
-        date=datetime.utcnow(),
+        date=datetime.now(),
         image_id=image_id
     )
     db.add(scorecard)
@@ -406,7 +407,7 @@ async def get_user_stats(
     
     # Filter by days if specified
     if days:
-        cutoff_date = datetime.utcnow() - timedelta(days=days)
+        cutoff_date = datetime.now() - timedelta(days=days)
         scorecards = scorecards.filter(Scorecard.date >= cutoff_date)
     
     scorecards = scorecards.order_by(Scorecard.date).all()
