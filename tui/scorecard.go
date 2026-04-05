@@ -277,8 +277,8 @@ func (m *model) setScorecardCell(c scCell, val int) {
 func formatRoundSummary(sc *scorecardData) string {
 	const w = 66 // inner width between │ characters
 
-	top    := "┌" + strings.Repeat("─", w) + "┐"
-	mid    := "├" + strings.Repeat("─", w) + "┤"
+	top := "┌" + strings.Repeat("─", w) + "┐"
+	mid := "├" + strings.Repeat("─", w) + "┤"
 	bottom := "└" + strings.Repeat("─", w) + "┘"
 
 	line := func(s string) string {
@@ -287,7 +287,7 @@ func formatRoundSummary(sc *scorecardData) string {
 
 	parTotal := 0
 	parFront := 0
-	parBack  := 0
+	parBack := 0
 	for i, p := range sc.HolePars {
 		parTotal += p
 		if i < 9 {
@@ -301,7 +301,7 @@ func formatRoundSummary(sc *scorecardData) string {
 	for _, p := range sc.Players {
 		scoreTotal := 0
 		scoreFront := 0
-		scoreBack  := 0
+		scoreBack := 0
 		birdies, pars, bogeys, doubles := 0, 0, 0, 0
 
 		for i, s := range p.Scores {
@@ -326,7 +326,7 @@ func formatRoundSummary(sc *scorecardData) string {
 
 		diffTotal := scoreTotal - parTotal
 		diffFront := scoreFront - parFront
-		diffBack  := scoreBack  - parBack
+		diffBack := scoreBack - parBack
 
 		sign := func(d int) string {
 			if d >= 0 {
@@ -357,59 +357,11 @@ func formatRoundSummary(sc *scorecardData) string {
 
 func (m model) saveScorecard() (tea.Model, tea.Cmd) {
 	sc := m.scorecard
-
-	// Build save JSON
-	type savePlayer struct {
-		Name   string `json:"name"`
-		Scores [18]int `json:"scores"`
-	}
-	type saveCourse struct {
-		Name     string  `json:"name"`
-		HolePars [18]int `json:"holePars"`
-	}
-	type savePayload struct {
-		Course    saveCourse   `json:"course"`
-		Players   []savePlayer `json:"players"`
-		ImagePath string       `json:"imagePath"`
-	}
-
-	payload := savePayload{
-		Course:    saveCourse{Name: sc.CourseName, HolePars: sc.HolePars},
-		ImagePath: sc.ImagePath,
-	}
-	for _, p := range sc.Players {
-		payload.Players = append(payload.Players, savePlayer{Name: p.Name, Scores: p.Scores})
-	}
-
-	raw, err := json.Marshal(payload)
-	if err != nil {
-		m.output = errorStyle.Render("Failed to encode scorecard: " + err.Error())
-		m.state = stateOutput
-		return m, nil
-	}
-
-	tmpPath := filepath.Join(os.TempDir(), "scorecard_review.json")
-	if err := os.WriteFile(tmpPath, raw, 0644); err != nil {
-		m.output = errorStyle.Render("Failed to write temp file: " + err.Error())
-		m.state = stateOutput
-		return m, nil
-	}
-
 	summary := formatRoundSummary(sc)
 	m.scorecard = nil
 	m.output = summary
 	m.state = stateOutput
-	return m, func() tea.Msg {
-		var errOut bytes.Buffer
-		c := exec.Command("python3", "scan.py", "save", tmpPath)
-		c.Dir = projectRoot
-		c.Stderr = &errOut
-		runErr := c.Run()
-		if runErr != nil {
-			return scorecardSavedMsg{err: fmt.Errorf("%w\n%s", runErr, errOut.String())}
-		}
-		return scorecardSavedMsg{}
-	}
+	return m, cmdSaveScorecard(sc)
 }
 
 // ── View ──────────────────────────────────────────────────────────────────────
