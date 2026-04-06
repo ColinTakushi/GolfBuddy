@@ -111,7 +111,7 @@ var menu = []menuItem{
 	},
 	{
 		label:       "close",
-		description: "Exit Golf Buddy.",
+		description: "Exit GolfBuddy.",
 	},
 }
 
@@ -578,7 +578,7 @@ func (m model) viewMenu() string {
 
 	// Build panels first, then size the title to match exactly
 	panels := lipgloss.JoinHorizontal(lipgloss.Top, leftPanel, rightPanel)
-	title := titleStyle.Width(lipgloss.Width(panels)).Render("WELCOME TO GOLF BUDDY")
+	title := titleStyle.Width(lipgloss.Width(panels)).Render("WELCOME TO GOLFBUDDY")
 	help := helpStyle.Render("↑/↓ navigate   enter select   esc back   q quit")
 
 	return lipgloss.JoinVertical(lipgloss.Left, title, panels, help)
@@ -588,7 +588,7 @@ func (m model) viewInput() string {
 	item := menu[m.menuIdx]
 	sub := item.subItems[m.subIdx]
 
-	title := titleStyle.Width(titleContentWidth).Render("WELCOME TO GOLF BUDDY")
+	title := titleStyle.Width(titleContentWidth).Render("WELCOME TO GOLFBUDDY")
 
 	content := breadcrumbStyle.Render(item.label+" › "+sub.label) +
 		"\n\n" +
@@ -627,7 +627,7 @@ func (m model) viewInput() string {
 }
 
 func (m model) viewOutput() string {
-	title := titleStyle.Width(titleContentWidth).Render("WELCOME TO GOLF BUDDY")
+	title := titleStyle.Width(titleContentWidth).Render("WELCOME TO GOLFBUDDY")
 
 	content := m.output
 	if content == "" {
