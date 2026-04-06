@@ -1,5 +1,4 @@
-# GolfBuddy
-
+![GolfBuddy](docs/banner.svg)
 > A golf scorecard tracking app with a terminal UI. Scan scorecards via Gemini OCR, browse player stats, view and edit rounds — all from the terminal.
 
 ![Go](https://img.shields.io/badge/Go-1.21+-00ADD8?logo=go&logoColor=white)
