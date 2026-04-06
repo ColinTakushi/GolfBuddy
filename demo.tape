@@ -6,8 +6,8 @@ Output docs/demo.gif
 
 Set Shell "zsh"
 Set FontSize 14
-Set Width 1920
-Set Height 1080
+Set Width 1600
+Set Height 1000
 Set Theme "Catppuccin Mocha"
 Set PlaybackSpeed 1.0
 Set TypingSpeed 50ms
