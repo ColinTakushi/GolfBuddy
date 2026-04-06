@@ -543,8 +543,6 @@ func (m model) View() string {
 }
 
 func (m model) viewMenu() string {
-	title := titleStyle.Width(titleContentWidth).Render("WELCOME TO GOLF BUDDY")
-
 	// Left panel
 	var leftLines []string
 	for i, item := range menu {
@@ -578,7 +576,9 @@ func (m model) viewMenu() string {
 	}
 	rightPanel := infoPanelStyle.Width(rightWidth).Height(9).Render(strings.Join(rightLines, "\n"))
 
+	// Build panels first, then size the title to match exactly
 	panels := lipgloss.JoinHorizontal(lipgloss.Top, leftPanel, rightPanel)
+	title := titleStyle.Width(lipgloss.Width(panels)).Render("WELCOME TO GOLF BUDDY")
 	help := helpStyle.Render("↑/↓ navigate   enter select   esc back   q quit")
 
 	return lipgloss.JoinVertical(lipgloss.Left, title, panels, help)
