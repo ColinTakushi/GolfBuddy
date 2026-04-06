@@ -27,7 +27,7 @@ func main() {
 	}
 
 	// Start the API server in the background.
-	server := exec.Command("python3", "main.py", "api")
+	server := exec.Command("python3", "src/main.py", "api")
 	server.Dir = projectRoot
 	if err := server.Start(); err != nil {
 		fmt.Fprintf(os.Stderr, "warning: could not start API server: %v\n", err)

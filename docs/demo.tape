@@ -1,4 +1,4 @@
-# GolfBuddy demo — run with: vhs demo.tape
+# GolfBuddy demo — run with: vhs docs/demo.tape (from project root)
 # Requires: vhs (https://github.com/charmbracelet/vhs)
 #           GEMINI_API_KEY set, dependencies installed
 

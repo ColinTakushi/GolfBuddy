@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 
 # Add src to path
-sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.api.server import app
 from src.analysis.stats import print_user_breakdown, print_all_users

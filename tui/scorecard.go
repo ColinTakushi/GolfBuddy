@@ -95,7 +95,7 @@ type scorecardSavedMsg struct{ err error }
 func runParseImage(imagePath string) tea.Cmd {
 	return func() tea.Msg {
 		var stdout, stderr bytes.Buffer
-		c := exec.Command("python3", "scan.py", "image", imagePath, "--parse")
+		c := exec.Command("python3", "src/scan.py", "image", imagePath, "--parse")
 		c.Dir = projectRoot
 		c.Stdout = &stdout
 		c.Stderr = &stderr

@@ -109,8 +109,9 @@ GolfBuddy/
 │   ├── scorecard.go    # Scorecard table editor (scan flow)
 │   ├── stats.go        # Stats browser (player list, round view)
 │   └── styles.go       # Lipgloss styles
-├── scan.py             # Python CLI for scanning scorecards
-├── main.py             # Python CLI entry point (api / stats / nuke)
+├── src/
+│   ├── main.py             # Python CLI entry point (api / stats / nuke)
+│   └── scan.py             # Python CLI for scanning scorecards
 └── requirements.txt
 ```
 
@@ -119,7 +120,7 @@ GolfBuddy/
 The API starts automatically when the TUI runs. It can also be started manually:
 
 ```bash
-python main.py api   # http://localhost:8000
+python src/main.py api   # http://localhost:8000
 ```
 
 | Method | Path | Description |

@@ -8,6 +8,8 @@ Usage:
     python3 scan.py save <json_path>             # save pre-reviewed JSON, no prompts
 """
 import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.ocr.pipeline import scan_and_store, store_json, parse_image, save_from_data
 import json
 
