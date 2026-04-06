@@ -46,7 +46,7 @@ def _call_gemini(image_path: str) -> dict:
 
     image_part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
 
-    print("Sending scorecard to Gemini 2.5 Flash...")
+    print("Sending scorecard to Gemini 2.5 Flash...", file=sys.stderr)
     response = client.models.generate_content(
         model="gemini-2.5-flash",
         contents=[_PROMPT, image_part],

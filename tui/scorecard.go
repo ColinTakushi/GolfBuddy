@@ -94,13 +94,17 @@ type scorecardSavedMsg struct{ err error }
 
 func runParseImage(imagePath string) tea.Cmd {
 	return func() tea.Msg {
-		var out bytes.Buffer
+		var stdout, stderr bytes.Buffer
 		c := exec.Command("python3", "scan.py", "image", imagePath, "--parse")
 		c.Dir = projectRoot
-		c.Stdout = &out
-		c.Stderr = &out
+		c.Stdout = &stdout
+		c.Stderr = &stderr
 		err := c.Run()
-		return cmdParseScorecardMsg{output: out.Bytes(), err: err}
+		if err != nil {
+			combined := append(stdout.Bytes(), stderr.Bytes()...)
+			return cmdParseScorecardMsg{output: combined, err: err}
+		}
+		return cmdParseScorecardMsg{output: stdout.Bytes(), err: nil}
 	}
 }
 
