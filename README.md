@@ -7,8 +7,7 @@
 ![Built with Bubbletea](https://img.shields.io/badge/Built%20with-Bubbletea-EE6FF8?logo=charm&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
-<!-- After recording demo.gif, uncomment this line: -->
-<!-- ![GolfBuddy demo](docs/demo.gif) -->
+![GolfBuddy demo](docs/demo.gif)
 
 ## How It Works
 
