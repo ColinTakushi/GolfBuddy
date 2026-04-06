@@ -383,7 +383,42 @@ func formatRoundSummary(sc *scorecardData) string {
 		parts = append(parts, sb.String())
 	}
 
-	return strings.Join(parts, "\n\n")
+	// Arrange in a 2-column grid
+	var rows []string
+	for i := 0; i < len(parts); i += 2 {
+		if i+1 < len(parts) {
+			rows = append(rows, joinCardsSideBySide(parts[i], parts[i+1]))
+		} else {
+			rows = append(rows, parts[i])
+		}
+	}
+	return strings.Join(rows, "\n\n")
+}
+
+// joinCardsSideBySide concatenates two fixed-width card strings side by side.
+// Each card line is exactly (w+2) visual columns, so we can join directly
+// without relying on lipgloss width measurement of box-drawing characters.
+func joinCardsSideBySide(left, right string) string {
+	leftLines := strings.Split(left, "\n")
+	rightLines := strings.Split(right, "\n")
+	maxH := len(leftLines)
+	if len(rightLines) > maxH {
+		maxH = len(rightLines)
+	}
+	var sb strings.Builder
+	for i := 0; i < maxH; i++ {
+		if i > 0 {
+			sb.WriteByte('\n')
+		}
+		if i < len(leftLines) {
+			sb.WriteString(leftLines[i])
+		}
+		sb.WriteString("  ")
+		if i < len(rightLines) {
+			sb.WriteString(rightLines[i])
+		}
+	}
+	return sb.String()
 }
 
 func (m model) saveScorecard() (tea.Model, tea.Cmd) {

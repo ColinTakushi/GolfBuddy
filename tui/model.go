@@ -627,14 +627,13 @@ func (m model) viewInput() string {
 }
 
 func (m model) viewOutput() string {
-	title := titleStyle.Width(titleContentWidth).Render("WELCOME TO GOLFBUDDY")
-
 	content := m.output
 	if content == "" {
 		content = successStyle.Render("Done!")
 	}
 
-	body := outputPanelStyle.Width(bodyContentWidth).Render(content)
+	body := outputPanelStyle.Render(content)
+	title := titleStyle.Width(lipgloss.Width(body)).Render("WELCOME TO GOLFBUDDY")
 	help := helpStyle.Render("any key to return")
 
 	return lipgloss.JoinVertical(lipgloss.Left, title, body, help)
