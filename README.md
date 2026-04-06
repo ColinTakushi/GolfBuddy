@@ -1,6 +1,35 @@
 # GolfBuddy
 
-A golf scorecard tracking app with a terminal UI. Scan scorecards via Gemini OCR, browse player stats, view and edit rounds — all from the terminal.
+> A golf scorecard tracking app with a terminal UI. Scan scorecards via Gemini OCR, browse player stats, view and edit rounds — all from the terminal.
+
+![Go](https://img.shields.io/badge/Go-1.21+-00ADD8?logo=go&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.12+-3776AB?logo=python&logoColor=white)
+![Built with Bubbletea](https://img.shields.io/badge/Built%20with-Bubbletea-EE6FF8?logo=charm&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-green)
+
+<!-- After recording demo.gif, uncomment this line: -->
+<!-- ![GolfBuddy demo](docs/demo.gif) -->
+
+## How It Works
+
+```
+Scorecard photo
+      │
+      ▼
+  Gemini OCR          ← google-genai
+      │
+      ▼
+  FastAPI server      ← starts automatically in background
+      │
+      ▼
+  Go TUI              ← Bubbletea + Lipgloss
+  ├── scan: review & edit extracted scores
+  ├── stats: browse players, rounds, aggregates
+  └── nuke: reset database
+      │
+      ▼
+  SQLite (SQLAlchemy)
+```
 
 ## Features
 
@@ -112,3 +141,7 @@ Interactive docs: `http://localhost:8000/docs`
 - **API**: FastAPI, Uvicorn
 - **Database**: SQLite via SQLAlchemy
 - **TUI**: Go, Bubbletea, Lipgloss
+
+## License
+
+MIT — see [LICENSE](LICENSE)
