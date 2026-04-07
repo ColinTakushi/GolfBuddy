@@ -158,6 +158,7 @@ func initialModel() model {
 	ti := textinput.New()
 	ti.CharLimit = 256
 	ti.Width = bodyContentWidth - 8
+	ti.Prompt = ""
 	return model{
 		state:  stateMainMenu,
 		input:  ti,
@@ -256,7 +257,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.state = stateOutput
 		return m, nil
 
-
 	case roundDeletedMsg:
 		m.scorecard = nil
 		m.roundID = 0
@@ -315,7 +315,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	default:
 		if m.state == stateInput ||
-			((m.state == stateScorecard || m.state == stateRoundView) && m.editingCell && m.cursor.isNameCell()) {
+			((m.state == stateScorecard || m.state == stateRoundView) && m.editingCell && (m.cursor.isPlayerNameCell() || m.cursor.isCourseNameCell())) {
 			var cmd tea.Cmd
 			m.input, cmd = m.input.Update(msg)
 			return m, cmd
