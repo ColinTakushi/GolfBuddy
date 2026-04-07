@@ -18,11 +18,11 @@ import (
 // ── Data types ────────────────────────────────────────────────────────────────
 
 type scorecardData struct {
-	CourseName   string       `json:"courseName"`
-	HolePars     [18]int      `json:"holePars"`
-	Players      []playerData `json:"players"`
-	ImagePath    string       `json:"imagePath"`
-	ScoreCardId  int 				`json:"id"`
+	CourseName  string       `json:"courseName"`
+	HolePars    [18]int      `json:"holePars"`
+	Players     []playerData `json:"players"`
+	ImagePath   string       `json:"imagePath"`
+	ScoreCardId int          `json:"id"`
 }
 
 type playerData struct {
@@ -115,7 +115,8 @@ func runParseImage(imagePath string) tea.Cmd {
 // col: -1 = name column, 0..17 = holes 1–18
 type scCell struct{ row, col int }
 
-func (c scCell) isNameCell() bool { return c.col == -1 }
+func (c scCell) isCourseNameCell() bool { return c.row == -1 }
+func (c scCell) isPlayerNameCell() bool { return c.col == -1 }
 func (c scCell) isNumberCell() bool {
 	return c.col >= 0 && c.col < 18
 }
@@ -125,26 +126,24 @@ func (c scCell) maxRow(sc *scorecardData) int {
 }
 
 func moveCursor(cur scCell, dr, dc int, sc *scorecardData) scCell {
-	maxR := len(sc.Players)
-	newCol := cur.col + dc
-	newRow := cur.row + dr
+	newCol := max(-1, min(17, cur.col+dc))
+	newRow := max(-1, min(len(sc.Players), cur.row+dr))
 
-	// col bounds: -1 (name) to 17 (hole 18) — clamp, no wrap
-	if newCol < -1 {
-		newCol = -1
-	} else if newCol > 17 {
-		newCol = 17
+	// course name (row -1) is a single cell — no horizontal movement
+	if cur.row == -1 {
+		newCol = cur.col
 	}
 
-	// row bounds: clamp to 0..maxR normally; name col also allows -1
-	minRow := 0
-	if newCol == -1 {
-		minRow = -1 // course name row reachable on name column
-	}
-	if newRow < minRow {
-		newRow = minRow
-	} else if newRow > maxR {
-		newRow = maxR
+	// (row 0, col -1) is the par label — not focusable; skip over it
+	if newRow == 0 && newCol == -1 {
+		switch cur.row {
+		case -1:
+			newRow = 1 // down from course name → first player
+		case 1:
+			newRow = -1 // up from first player → course name
+		default:
+			newCol = 0 // left within par row → clamp to hole 1
+		}
 	}
 
 	return scCell{newRow, newCol}
@@ -202,7 +201,7 @@ func (m model) updateScorecardNav(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "enter", "e":
 		m.editingCell = true
 		m.editBuf = ""
-		if m.cursor.isNameCell() {
+		if m.cursor.isPlayerNameCell() || m.cursor.isCourseNameCell() {
 			// pre-fill textinput with current name
 			var name string
 			if m.cursor.row == -1 {
@@ -222,7 +221,7 @@ func (m model) updateScorecardNav(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m model) updateScorecardEdit(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Name cell edit — delegate to textinput
-	if m.cursor.isNameCell() {
+	if m.cursor.isPlayerNameCell() || m.cursor.isCourseNameCell() {
 		switch msg.String() {
 		case "ctrl+c":
 			return m, tea.Quit
@@ -442,10 +441,19 @@ func (m model) renderScorecardTable() string {
 
 	// ── helpers ──
 	isFocused := func(row, col int) bool {
-		return !m.editingCell && m.cursor.row == row && m.cursor.col == col
+		if row == -1 {
+			// don't care about course name row's column number
+			return !m.editingCell && m.cursor.row == row
+		} else {
+			return !m.editingCell && m.cursor.row == row && m.cursor.col == col
+		}
 	}
 	isEditing := func(row, col int) bool {
-		return m.editingCell && m.cursor.row == row && m.cursor.col == col
+		if row == -1 {
+			return m.editingCell && m.cursor.row == row
+		} else {
+			return m.editingCell && m.cursor.row == row && m.cursor.col == col
+		}
 	}
 
 	renderNum := func(val int, w int, row, col int) string {
@@ -470,9 +478,9 @@ func (m model) renderScorecardTable() string {
 		s := fmt.Sprintf("%-*s", width, name)
 		switch {
 		case isEditing(row, -1):
-			inp := m.input.View()
-			if len(inp) > width {
-				inp = inp[:width]
+			inp := m.input.Value()
+			if len([]rune(inp)) > width {
+				inp = string([]rune(inp)[:width])
 			}
 			return editingCellStyle.Render(fmt.Sprintf("%-*s", width, inp))
 		case isFocused(row, -1):
@@ -573,13 +581,23 @@ func (m model) viewScorecard() string {
 }
 
 func renderCourseName(name string, m model, focused, editing bool) string {
+	const width = 79
 	if editing {
-		return m.input.View()
+		inp := m.input.Value()
+		if len([]rune(inp)) > width {
+			inp = string([]rune(inp)[:width])
+		}
+		return editingCellStyle.Render(fmt.Sprintf("%-*s", width, inp))
 	}
 	if focused {
-		return focusedCellStyle.Render(name)
+		rendered := focusedCellStyle.Render(name)
+		// ANSI codes don't count as visual width — pad manually
+		if pad := width - lipgloss.Width(rendered); pad > 0 {
+			rendered += strings.Repeat(" ", pad)
+		}
+		return rendered
 	}
-	return name
+	return fmt.Sprintf("%-*s", width, name)
 }
 
 func (m model) viewDeleteConfirm() string {
