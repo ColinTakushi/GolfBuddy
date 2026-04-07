@@ -49,9 +49,10 @@ func init() {
 type scanModeType int
 
 const (
-	scanModeNone  scanModeType = iota
-	scanModeImage              // parse via Gemini, show scorecard editor
-	scanModeJSON               // read JSON file directly, show scorecard editor
+	scanModeNone     scanModeType = iota
+	scanModeImage                 // parse via Gemini, show scoreor
+	scanModeJSON                  // read JSON file directly, show scorecard editor
+	manualEnteryMode              // manually enter a new score card
 )
 
 type subItem struct {
@@ -71,39 +72,43 @@ type menuItem struct {
 
 var menu = []menuItem{
 	{
-		label:       "scan",
-		description: "Scan a golf scorecard.\nSend an image to Gemini OCR\nor load from a pre-scanned JSON.",
+		label:       "New Entry",
+		description: "Enter a new score card.\nYou can either use Gemini for scanning\nan image of your score card, load from\na pre-scanned JSON, or manually enter one.",
 		subItems: []subItem{
 			{
-				label:     "image",
-				prompt:    "Enter path to scorecard image:",
+				label:     "Image",
+				prompt:    "Enter path to scorecard image to scan:",
 				fileInput: true,
 				scanMode:  scanModeImage,
 			},
 			{
-				label:     "json",
+				label:     "JSON",
 				prompt:    "Enter path to JSON file:",
 				fileInput: true,
 				scanMode:  scanModeJSON,
 			},
+			{
+				label:    "Manual",
+				scanMode: manualEnteryMode,
+			},
 		},
 	},
 	{
-		label:       "stats",
+		label:       "Stats",
 		description: "Browse player statistics.\nSelect a player to view\nrounds and scorecards.",
 	},
 	{
-		label:       "nuke",
+		label:       "Nuke",
 		description: "Delete ALL data and recreate\nthe database schema.\nThis cannot be undone.",
 		subItems: []subItem{
 			{
-				label:  "confirm",
+				label:  "Confirm",
 				prompt: `Type "yes" to confirm:`,
 			},
 		},
 	},
 	{
-		label:       "close",
+		label:       "Close",
 		description: "Exit GolfBuddy.",
 	},
 }
@@ -150,7 +155,7 @@ type model struct {
 func initialModel() model {
 	ti := textinput.New()
 	ti.CharLimit = 256
-	ti.Width = bodyContentWidth - 8
+	ti.Width = menuBodyWidth - 8
 	ti.Prompt = ""
 	return model{
 		state:  stateMainMenu,
@@ -200,7 +205,21 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.editingCell = false
 		m.state = stateScorecard
 		return m, nil
-
+	case scorecardManualEntryMsg:
+		if msg.err != nil {
+			m.output = errorStyle.Render("Failed to read file: " + msg.err.Error())
+			m.state = stateOutput
+			return m, nil
+		}
+		if msg.data != nil {
+			m.scorecard = msg.data
+		} else {
+			m.scorecard = newBlankScorecard()
+		}
+		m.cursor = scCell{1, 0}
+		m.editingCell = false
+		m.state = stateScorecard
+		return m, nil
 	case scorecardSavedMsg:
 		if msg.err != nil {
 			m.output = errorStyle.Render("Save failed: "+msg.err.Error()) + "\n\n" + m.output
@@ -331,10 +350,10 @@ func (m model) updateMainMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "enter", "right", "l":
 		item := menu[m.menuIdx]
-		if item.label == "close" {
+		if item.label == "Close" {
 			return m, tea.Quit
 		}
-		if item.label == "stats" {
+		if item.label == "Stats" {
 			m.players = nil
 			m.playerIdx = 0
 			m.state = statePlayerList
@@ -363,6 +382,13 @@ func (m model) updateSubMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "enter", "right", "l":
 		sub := item.subItems[m.subIdx]
+		if sub.scanMode == manualEnteryMode {
+			m.scorecard = newBlankScorecard()
+			m.cursor = scCell{1, 0}
+			m.editingCell = false
+			m.state = stateScorecard
+			return m, nil
+		}
 		if sub.prompt != "" {
 			m.input.Reset()
 			m.completions = nil
@@ -412,7 +438,7 @@ func (m model) updateInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "enter":
 		val := strings.TrimSpace(m.input.Value())
 		item := menu[m.menuIdx]
-		if item.label == "nuke" && val != "yes" {
+		if item.label == "Nuke" && val != "yes" {
 			m.output = errorStyle.Render(`Cancelled. You must type "yes" to confirm.`)
 			m.input.Blur()
 			m.completions = nil
@@ -422,7 +448,7 @@ func (m model) updateInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.input.Blur()
 		m.completions = nil
 
-		if item.label == "nuke" {
+		if item.label == "Nuke" {
 			return m, cmdNukeDatabase()
 		}
 
@@ -434,6 +460,11 @@ func (m model) updateInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, func() tea.Msg {
 				data, err := readScorecardFile(val)
 				return scorecardParsedMsg{data: data, err: err}
+			}
+		case manualEnteryMode:
+			m.state = stateScorecard
+			return m, func() tea.Msg {
+				return scorecardManualEntryMsg{data: nil, err: nil}
 			}
 		}
 		return m.runSub(sub, val)
