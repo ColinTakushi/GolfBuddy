@@ -27,13 +27,6 @@ const (
 	stateConfirmDelete
 )
 
-const (
-	leftWidth  = 28
-	rightWidth = 99
-	// Total rendered width: leftWidth + 7 (border+padding+margin) + rightWidth + 6 (border+padding) = 140
-	titleContentWidth = leftWidth + rightWidth + 9 // = 136, renders to 140 with title padding
-	bodyContentWidth  = leftWidth + rightWidth + 7 // = 134, renders to 140 with panel border+padding
-)
 
 // projectRoot is the GolfBuddy directory (parent of tui/).
 var projectRoot string
@@ -561,7 +554,7 @@ func (m model) viewMenu() string {
 			leftLines = append(leftLines, normalItemStyle.Render("  "+item.label))
 		}
 	}
-	leftPanel := menuPanelStyle.Width(leftWidth).Render(strings.Join(leftLines, "\n"))
+	leftPanel := menuPanelStyle.Width(menuLeftWidth).Render(strings.Join(leftLines, "\n"))
 
 	// Right panel
 	selected := menu[m.menuIdx]
@@ -574,7 +567,7 @@ func (m model) viewMenu() string {
 			rightLines = append(rightLines, dimStyle.Render("  "+sub.label))
 		}
 	}
-	rightPanel := infoPanelStyle.Width(rightWidth).Height(9).Render(strings.Join(rightLines, "\n"))
+	rightPanel := infoPanelStyle.Width(menuRightWidth).Height(12).Render(strings.Join(rightLines, "\n"))
 
 	// Build panels first, then size the title to match exactly
 	panels := lipgloss.JoinHorizontal(lipgloss.Top, leftPanel, rightPanel)
@@ -588,7 +581,7 @@ func (m model) viewInput() string {
 	item := menu[m.menuIdx]
 	sub := item.subItems[m.subIdx]
 
-	title := titleStyle.Width(titleContentWidth).Render("WELCOME TO GOLFBUDDY")
+	title := titleStyle.Width(menuTitleWidth).Render("WELCOME TO GOLFBUDDY")
 
 	content := breadcrumbStyle.Render(item.label+" › "+sub.label) +
 		"\n\n" +
@@ -615,7 +608,7 @@ func (m model) viewInput() string {
 		}
 	}
 
-	body := inputPanelStyle.Width(bodyContentWidth).Render(content)
+	body := inputPanelStyle.Width(menuBodyWidth).Render(content)
 
 	helpText := "enter confirm   esc back   ctrl+c quit"
 	if sub.fileInput {

@@ -154,19 +154,15 @@ func (m model) updateRoundView(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // ── Views ─────────────────────────────────────────────────────────────────────
 
-const statsPanelWidth = 70
-
 func (m model) viewPlayerList() string {
-	const inner = statsPanelWidth - 2
-
-	top    := "┌" + strings.Repeat("─", inner) + "┐"
-	bottom := "└" + strings.Repeat("─", inner) + "┘"
-	line   := func(s string) string { return "│" + fmt.Sprintf("%-*s", inner, s) + "│" }
+	top    := "┌" + strings.Repeat("─", statsInner) + "┐"
+	bottom := "└" + strings.Repeat("─", statsInner) + "┘"
+	line   := func(s string) string { return "│" + fmt.Sprintf("%-*s", statsInner, s) + "│" }
 
 	var sb strings.Builder
 	sb.WriteString(top + "\n")
 
-	title := centerPad(" SELECT PLAYER ", inner, '─')
+	title := centerPad(" SELECT PLAYER ", statsInner, '─')
 	sb.WriteString("├" + title + "┤\n")
 	sb.WriteString(line("") + "\n")
 
@@ -180,10 +176,10 @@ func (m model) viewPlayerList() string {
 			if p.Rounds != 1 {
 				rounds += "s"
 			}
-			content := fmt.Sprintf("  %-*s %s", inner-12, p.Name, rounds)
+			content := fmt.Sprintf("  %-*s %s", statsInner-12, p.Name, rounds)
 			if i == m.playerIdx {
 				content = selectedItemStyle.Render("> " + content[2:])
-				sb.WriteString("│" + padRight(content, inner) + "│\n")
+				sb.WriteString("│" + padRight(content, statsInner) + "│\n")
 			} else {
 				sb.WriteString(line(content) + "\n")
 			}
@@ -199,17 +195,15 @@ func (m model) viewPlayerList() string {
 }
 
 func (m model) viewPlayerDetail() string {
-	const inner = statsPanelWidth - 2
-
-	top    := "┌" + strings.Repeat("─", inner) + "┐"
-	mid    := "├" + strings.Repeat("─", inner) + "┤"
-	bottom := "└" + strings.Repeat("─", inner) + "┘"
-	line   := func(s string) string { return "│" + fmt.Sprintf("%-*s", inner, s) + "│" }
+	top    := "┌" + strings.Repeat("─", statsInner) + "┐"
+	mid    := "├" + strings.Repeat("─", statsInner) + "┤"
+	bottom := "└" + strings.Repeat("─", statsInner) + "┘"
+	line   := func(s string) string { return "│" + fmt.Sprintf("%-*s", statsInner, s) + "│" }
 
 	var sb strings.Builder
 
 	// Title bar
-	title := centerPad(" "+strings.ToUpper(m.playerName)+" ", inner, '─')
+	title := centerPad(" "+strings.ToUpper(m.playerName)+" ", statsInner, '─')
 	sb.WriteString("┌" + title + "┐\n")
 
 	// Stats bar
@@ -224,7 +218,7 @@ func (m model) viewPlayerDetail() string {
 	sb.WriteString(mid + "\n")
 
 	// Column header
-	sb.WriteString(line(fmt.Sprintf("  %-12s %-28s %5s  %5s", "DATE", "COURSE", "SCORE", "+/-")) + "\n")
+	sb.WriteString(line(fmt.Sprintf("  %-*s %-*s %5s  %5s", statsDateCol, "DATE", statsCourseCol, "COURSE", "SCORE", "+/-")) + "\n")
 	sb.WriteString(mid + "\n")
 
 	if m.rounds == nil {
@@ -237,9 +231,9 @@ func (m model) viewPlayerDetail() string {
 			if r.Diff < 0 {
 				sign = ""
 			}
-			content := fmt.Sprintf("  %-12s %-28s %5d  %s%d", r.Date, truncate(r.Course, 28), r.Score, sign, r.Diff)
+			content := fmt.Sprintf("  %-*s %-*s %5d  %s%d", statsDateCol, r.Date, statsCourseCol, truncate(r.Course, statsCourseCol), r.Score, sign, r.Diff)
 			if i == m.roundIdx {
-				sb.WriteString("│" + padRight(selectedItemStyle.Render("> "+content[2:]), inner) + "│\n")
+				sb.WriteString("│" + padRight(selectedItemStyle.Render("> "+content[2:]), statsInner) + "│\n")
 			} else {
 				sb.WriteString(line(content) + "\n")
 			}
