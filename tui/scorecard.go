@@ -276,7 +276,18 @@ func (m model) updateScorecardEdit(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "esc":
 			m.editingCell = false
 			m.input.Blur()
-		case "enter", "up", "down", "left", "right":
+		case "enter":
+			name := strings.TrimSpace(m.input.Value())
+			if name != "" {
+				if m.cursor.row == -1 {
+					m.scorecard.CourseName = name
+				} else {
+					m.scorecard.Players[m.cursor.row-1].Name = name
+				}
+			}
+			m.editingCell = false
+			m.input.Blur()
+		case "up", "down", "left", "right":
 			m.editingCell = false
 			m.editBuf = ""
 			key := msg.String()

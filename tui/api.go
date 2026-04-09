@@ -25,7 +25,7 @@ func cmdFetchPlayers() tea.Cmd {
 		var raw []struct {
 			Username        string `json:"username"`
 			ScorecardsCount int    `json:"scorecards_count"`
-			PlayerId				int    `json:"id"`
+			PlayerId        int    `json:"id"`
 		}
 		if err := json.Unmarshal(body, &raw); err != nil {
 			return playerListMsg{err: err}
@@ -112,14 +112,14 @@ func cmdFetchRoundDetail(name string, id int) tea.Cmd {
 		body, _ := io.ReadAll(resp.Body)
 
 		var raw struct {
-			ScorecardID     int    `json:"scorecardId"`
-			User            string `json:"user"`
-			Course          string `json:"course"`
-			UserID          int    `json:"uiserId"`
-			Holes           []struct {
-				HoleNumber      int `json:"hole_number"`
-				Score           int `json:"score"`
-				Par             int `json:"par"`
+			ScorecardID int    `json:"scorecardId"`
+			User        string `json:"user"`
+			Course      string `json:"course"`
+			UserID      int    `json:"uiserId"`
+			Holes       []struct {
+				HoleNumber int `json:"hole_number"`
+				Score      int `json:"score"`
+				Par        int `json:"par"`
 			} `json:"holes"`
 		}
 		if err := json.Unmarshal(body, &raw); err != nil {
@@ -130,12 +130,12 @@ func cmdFetchRoundDetail(name string, id int) tea.Cmd {
 		}
 
 		sc := &scorecardData{
-			CourseName: raw.Course,
+			CourseName:  raw.Course,
 			ScoreCardId: raw.ScorecardID,
 		}
 		pd := playerData{
 			Name: raw.User,
-			ID: raw.UserID,
+			ID:   raw.UserID,
 		}
 		for _, h := range raw.Holes {
 			i := h.HoleNumber - 1
@@ -170,7 +170,13 @@ func cmdSaveScorecard(sc *scorecardData) tea.Cmd {
 		ImagePath: sc.ImagePath,
 	}
 	for _, p := range sc.Players {
-		payload.Players = append(payload.Players, savePlayer{Name: p.Name, Scores: p.Scores})
+		total := 0
+		for _, s := range p.Scores{
+			total += s
+		}		
+		if total != 0 {
+			payload.Players = append(payload.Players, savePlayer{Name: p.Name, Scores: p.Scores})
+		}
 	}
 	raw, _ := json.Marshal(payload)
 
