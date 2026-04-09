@@ -276,17 +276,25 @@ func (m model) updateScorecardEdit(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "esc":
 			m.editingCell = false
 			m.input.Blur()
-		case "enter":
-			name := strings.TrimSpace(m.input.Value())
-			if name != "" {
-				if m.cursor.row == -1 {
-					m.scorecard.CourseName = name
-				} else {
-					m.scorecard.Players[m.cursor.row-1].Name = name
-				}
-			}
+		case "enter", "up", "down", "left", "right":
 			m.editingCell = false
-			m.input.Blur()
+			m.editBuf = ""
+			key := msg.String()
+			if key != "enter" {
+				dr, dc := 0, 0
+				switch key {
+				case "up":
+					dr = -1
+				case "down":
+					dr = 1
+				case "left":
+					dc = -1
+				case "right":
+					dc = 1
+				}
+				m.cursor = moveCursor(m.cursor, dr, dc, m.scorecard)
+				return m.maybeAutoEdit()
+			}
 		default:
 			var cmd tea.Cmd
 			m.input, cmd = m.input.Update(msg)
@@ -355,13 +363,17 @@ func (m *model) setScorecardCell(c scCell, val int) {
 func (m *model) getScorecardCell(c scCell) cellContent {
 	var result cellContent
 	if c.row == 0 {
+		// Par row
 		result.Score = m.scorecard.HolePars[c.col]
+	} else if c.row == -1 {
+		// Course Name Row
+		result.Name = m.scorecard.CourseName
 	} else if c.col == -1 {
+		// player name row
 		result.Name = m.scorecard.Players[c.row-1].Name
 	} else if c.row > 0 && c.row-1 < len(m.scorecard.Players) {
+		// score section
 		result.Score = m.scorecard.Players[c.row-1].Scores[c.col]
-	} else if c.row == -1 && c.col != -1 {
-		result.Name = m.scorecard.CourseName
 	}
 	return result
 }
