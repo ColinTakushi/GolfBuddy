@@ -44,6 +44,11 @@ type rawScorecardJSON struct {
 	ImagePath string `json:"imagePath"`
 }
 
+type cellContent struct {
+	Name  string
+	Score int
+}
+
 func parseScorecardJSON(raw []byte) (*scorecardData, error) {
 	var r rawScorecardJSON
 	if err := json.Unmarshal(raw, &r); err != nil {
@@ -75,9 +80,21 @@ func readScorecardFile(path string) (*scorecardData, error) {
 	return parseScorecardJSON(raw)
 }
 
+func newBlankScorecard() *scorecardData {
+	return &scorecardData{
+		CourseName: "ENTER COURSE NAME",
+		Players:    []playerData{{Name: "P1"}, {Name: "P2"}, {Name: "P3"}, {Name: "P4"}},
+	}
+}
+
 // ── Messages ──────────────────────────────────────────────────────────────────
 
 type scorecardParsedMsg struct {
+	data *scorecardData
+	err  error
+}
+
+type scorecardManualEntryMsg struct {
 	data *scorecardData
 	err  error
 }
@@ -192,12 +209,16 @@ func (m model) updateScorecardNav(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.state = stateMainMenu
 	case "up", "k":
 		m.cursor = moveCursor(m.cursor, -1, 0, m.scorecard)
+		return m.maybeAutoEdit()
 	case "down", "j":
 		m.cursor = moveCursor(m.cursor, 1, 0, m.scorecard)
+		return m.maybeAutoEdit()
 	case "left", "h":
 		m.cursor = moveCursor(m.cursor, 0, -1, m.scorecard)
+		return m.maybeAutoEdit()
 	case "right", "l":
 		m.cursor = moveCursor(m.cursor, 0, 1, m.scorecard)
+		return m.maybeAutoEdit()
 	case "enter", "e":
 		m.editingCell = true
 		m.editBuf = ""
@@ -217,6 +238,33 @@ func (m model) updateScorecardNav(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.saveScorecard()
 	}
 	return m, nil
+}
+
+// maybeAutoEdit enters edit mode automatically when the cursor lands on a cell
+// that still holds its default value.
+func (m model) maybeAutoEdit() (tea.Model, tea.Cmd) {
+	cell := m.getScorecardCell(m.cursor)
+	isDefaultName := cell.Name == "ENTER COURSE NAME" || isDefaultPlayerName(cell.Name)
+	isBlankScore := m.cursor.isNumberCell() && cell.Score == 0
+
+	if isDefaultName && (m.cursor.isPlayerNameCell() || m.cursor.isCourseNameCell()) {
+		m.editingCell = true
+		m.editBuf = ""
+		m.input.SetValue(cell.Name)
+		m.input.CursorEnd()
+		return m, m.input.Focus()
+	}
+	if isBlankScore && !(m.cursor.isPlayerNameCell() || m.cursor.isCourseNameCell()) {
+		m.editingCell = true
+		m.editBuf = ""
+	}
+	return m, nil
+}
+
+// isDefaultPlayerName reports whether name is one of the blank-scorecard
+// placeholder names (P1–P9).
+func isDefaultPlayerName(name string) bool {
+	return len(name) == 2 && name[0] == 'P' && name[1] >= '1' && name[1] <= '9'
 }
 
 func (m model) updateScorecardEdit(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -239,6 +287,25 @@ func (m model) updateScorecardEdit(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			m.editingCell = false
 			m.input.Blur()
+		case "up", "down", "left", "right":
+			m.editingCell = false
+			m.editBuf = ""
+			key := msg.String()
+			if key != "enter" {
+				dr, dc := 0, 0
+				switch key {
+				case "up":
+					dr = -1
+				case "down":
+					dr = 1
+				case "left":
+					dc = -1
+				case "right":
+					dc = 1
+				}
+				m.cursor = moveCursor(m.cursor, dr, dc, m.scorecard)
+				return m.maybeAutoEdit()
+			}
 		default:
 			var cmd tea.Cmd
 			m.input, cmd = m.input.Update(msg)
@@ -271,6 +338,7 @@ func (m model) updateScorecardEdit(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				dc = 1
 			}
 			m.cursor = moveCursor(m.cursor, dr, dc, m.scorecard)
+			return m.maybeAutoEdit()
 		}
 	case "backspace", "delete":
 		if len(m.editBuf) > 0 {
@@ -303,9 +371,44 @@ func (m *model) setScorecardCell(c scCell, val int) {
 	}
 }
 
+func (m *model) getScorecardCell(c scCell) cellContent {
+	var result cellContent
+	if c.row == 0 {
+		// Par row
+		result.Score = m.scorecard.HolePars[c.col]
+	} else if c.row == -1 {
+		// Course Name Row
+		result.Name = m.scorecard.CourseName
+	} else if c.col == -1 {
+		// player name row
+		result.Name = m.scorecard.Players[c.row-1].Name
+	} else if c.row > 0 && c.row-1 < len(m.scorecard.Players) {
+		// score section
+		result.Score = m.scorecard.Players[c.row-1].Scores[c.col]
+	}
+	return result
+}
+
+func cleanUpScoreCard(sc *scorecardData) {
+	i := 0
+	for _, player := range sc.Players{
+		total := 0
+		for _, score := range player.Scores{
+			total += score
+		}
+		if total != 0{
+			sc.Players[i] = player
+			i++
+		}
+	}
+
+	sc.Players = sc.Players[:i]		
+}
+
 // formatRoundSummary builds box-drawing output for every player in the scorecard.
 func formatRoundSummary(sc *scorecardData) string {
 	const w = 66 // inner width between │ characters
+	cleanUpScoreCard(sc)
 
 	top := "┌" + strings.Repeat("─", w) + "┐"
 	mid := "├" + strings.Repeat("─", w) + "┤"
