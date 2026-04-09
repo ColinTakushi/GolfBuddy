@@ -170,13 +170,7 @@ func cmdSaveScorecard(sc *scorecardData) tea.Cmd {
 		ImagePath: sc.ImagePath,
 	}
 	for _, p := range sc.Players {
-		total := 0
-		for _, s := range p.Scores{
-			total += s
-		}		
-		if total != 0 {
-			payload.Players = append(payload.Players, savePlayer{Name: p.Name, Scores: p.Scores})
-		}
+		payload.Players = append(payload.Players, savePlayer{Name: p.Name, Scores: p.Scores})
 	}
 	raw, _ := json.Marshal(payload)
 

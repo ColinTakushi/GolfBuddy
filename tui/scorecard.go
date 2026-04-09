@@ -389,9 +389,26 @@ func (m *model) getScorecardCell(c scCell) cellContent {
 	return result
 }
 
+func cleanUpScoreCard(sc *scorecardData) {
+	i := 0
+	for _, player := range sc.Players{
+		total := 0
+		for _, score := range player.Scores{
+			total += score
+		}
+		if total != 0{
+			sc.Players[i] = player
+			i++
+		}
+	}
+
+	sc.Players = sc.Players[:i]		
+}
+
 // formatRoundSummary builds box-drawing output for every player in the scorecard.
 func formatRoundSummary(sc *scorecardData) string {
 	const w = 66 // inner width between │ characters
+	cleanUpScoreCard(sc)
 
 	top := "┌" + strings.Repeat("─", w) + "┐"
 	mid := "├" + strings.Repeat("─", w) + "┤"
