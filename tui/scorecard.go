@@ -391,18 +391,18 @@ func (m *model) getScorecardCell(c scCell) cellContent {
 
 func cleanUpScoreCard(sc *scorecardData) {
 	i := 0
-	for _, player := range sc.Players{
+	for _, player := range sc.Players {
 		total := 0
-		for _, score := range player.Scores{
+		for _, score := range player.Scores {
 			total += score
 		}
-		if total != 0{
+		if total != 0 {
 			sc.Players[i] = player
 			i++
 		}
 	}
 
-	sc.Players = sc.Players[:i]		
+	sc.Players = sc.Players[:i]
 }
 
 // formatRoundSummary builds box-drawing output for every player in the scorecard.
@@ -556,6 +556,15 @@ func (m model) renderScorecardTable() string {
 			return m.editingCell && m.cursor.row == row && m.cursor.col == col
 		}
 	}
+	isFaultyNum := func(row, col int) bool {
+		score := m.getScorecardCell(scCell{row, col}).Score
+		return (score == -1 || score == 0)
+	}
+	isFaultyName := func(row, col int) bool {
+		name := m.getScorecardCell(scCell{row, col}).Name
+		return name == "PLAYER"
+	}
+	// ── helpers ──
 
 	renderNum := func(val int, w int, row, col int) string {
 		s := fmt.Sprintf("%*d", w, val)
@@ -570,6 +579,8 @@ func (m model) renderScorecardTable() string {
 			return editingCellStyle.Render(display)
 		case isFocused(row, col):
 			return focusedCellStyle.Render(s)
+		case isFaultyNum(row, col):
+			return errorCellStyle.Render(s)
 		default:
 			return s
 		}
@@ -589,6 +600,8 @@ func (m model) renderScorecardTable() string {
 			return editingCellStyle.Render(fmt.Sprintf("%-*s", width, inp))
 		case isFocused(row, -1):
 			return focusedCellStyle.Render(s)
+		case isFaultyName(row, -1):
+			return errorCellStyle.Render(s)
 		default:
 			return s
 		}
@@ -609,14 +622,14 @@ func (m model) renderScorecardTable() string {
 	nd := strings.Repeat("─", scNameColWidth+2) // name-col dashes
 	ne := strings.Repeat("═", scNameColWidth+2) // name-col equals (double border)
 
-	topBorder    := "┌" + strings.Repeat("─", scTableInner) + "┐"
-	header       := fmt.Sprintf("│ COURSE: %-*s PAR: %3d │", scCourseNameWidth,
+	topBorder := "┌" + strings.Repeat("─", scTableInner) + "┐"
+	header := fmt.Sprintf("│ COURSE: %-*s PAR: %3d │", scCourseNameWidth,
 		renderCourseName(sc.CourseName, m, isFocused(-1, -1), isEditing(-1, -1)), parTotal)
-	colSep       := "├" + nd + "┬───┬───┬───┬───┬───┬───┬───┬───┬───╥─────┬───┬───┬───┬───┬───┬───┬───┬───┬───╥─────╥─────┤"
-	holeRow      := fmt.Sprintf("│ %-*s │ 1 │ 2 │ 3 │ 4 │ 5 │ 6 │ 7 │ 8 │ 9 ║ OUT │10 │11 │12 │13 │14 │15 │16 │17 │18 ║ IN  ║ TOT │", scNameColWidth, "HOLE")
-	holeSep      := "├" + nd + "┼───┼───┼───┼───┼───┼───┼───┼───┼───╫─────┼───┼───┼───┼───┼───┼───┼───┼───┼───╫─────╫─────┤"
+	colSep := "├" + nd + "┬───┬───┬───┬───┬───┬───┬───┬───┬───╥─────┬───┬───┬───┬───┬───┬───┬───┬───┬───╥─────╥─────┤"
+	holeRow := fmt.Sprintf("│ %-*s │ 1 │ 2 │ 3 │ 4 │ 5 │ 6 │ 7 │ 8 │ 9 ║ OUT │10 │11 │12 │13 │14 │15 │16 │17 │18 ║ IN  ║ TOT │", scNameColWidth, "HOLE")
+	holeSep := "├" + nd + "┼───┼───┼───┼───┼───┼───┼───┼───┼───╫─────┼───┼───┼───┼───┼───┼───┼───┼───┼───╫─────╫─────┤"
 	parPlayerSep := "╞" + ne + "╪═══╪═══╪═══╪═══╪═══╪═══╪═══╪═══╪═══╬═════╪═══╪═══╪═══╪═══╪═══╪═══╪═══╪═══╪═══╬═════╬═════╡"
-	playerSep    := "├" + nd + "┼───┼───┼───┼───┼───┼───┼───┼───┼───╫─────┼───┼───┼───┼───┼───┼───┼───┼───┼───╫─────╫─────┤"
+	playerSep := "├" + nd + "┼───┼───┼───┼───┼───┼───┼───┼───┼───╫─────┼───┼───┼───┼───┼───┼───┼───┼───┼───╫─────╫─────┤"
 	bottomBorder := "└" + nd + "┴───┴───┴───┴───┴───┴───┴───┴───┴───╨─────┴───┴───┴───┴───┴───┴───┴───┴───┴───╨─────╨─────┘"
 
 	parRow := fmt.Sprintf("│ %-*s │%s│%s│%s│%s│%s│%s│%s│%s│%s║%s│%s│%s│%s│%s│%s│%s│%s│%s│%s║%s║%s│",
@@ -703,6 +716,13 @@ func renderCourseName(name string, m model, focused, editing bool) string {
 			rendered += strings.Repeat(" ", pad)
 		}
 		return rendered
+	}
+	if name == "COURSE" {
+		if len([]rune(name)) > width {
+			name = string([]rune(name)[:width])
+		}
+		padding := width - len([]rune(name))
+		return errorCellStyle.Render(name) + fmt.Sprintf("%-*s", padding, "")
 	}
 	return fmt.Sprintf("%-*s", width, name)
 }
