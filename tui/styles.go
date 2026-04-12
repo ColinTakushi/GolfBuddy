@@ -25,15 +25,26 @@ var (
 			PaddingLeft(2).
 			PaddingRight(2)
 
-	panelStyle = lipgloss.NewStyle().
+	menuPanelStyle = lipgloss.NewStyle().
+			BorderStyle(lipgloss.RoundedBorder()).
+			BorderForeground(colorGreenMid).
+			Padding(1, 2).
+			MarginRight(1)
+
+	infoPanelStyle = lipgloss.NewStyle().
 			BorderStyle(lipgloss.RoundedBorder()).
 			BorderForeground(colorGreenMid).
 			Padding(1, 2)
 
-	menuPanelStyle   = panelStyle.MarginRight(1)
-	infoPanelStyle   = panelStyle
-	inputPanelStyle  = panelStyle
-	outputPanelStyle = panelStyle
+	inputPanelStyle = lipgloss.NewStyle().
+			BorderStyle(lipgloss.RoundedBorder()).
+			BorderForeground(colorGreenMid).
+			Padding(1, 2)
+
+	outputPanelStyle = lipgloss.NewStyle().
+				BorderStyle(lipgloss.RoundedBorder()).
+				BorderForeground(colorGreenMid).
+				Padding(1, 2)
 
 	selectedItemStyle = lipgloss.NewStyle().
 				Foreground(colorGreenMid).
