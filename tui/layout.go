@@ -16,6 +16,10 @@ const (
 	statsDateCol     = 12                  // width of the date column
 	statsCourseCol   = 28                  // width of the course name column
 
+	// ── All-rounds card view ──────────────────────────────────────────────────
+	allRoundsCardOuter = statsInner - 4         // 64: card width including its borders
+	allRoundsCardInner = allRoundsCardOuter - 2 // 62: card content width
+
 	// ── Scorecard table ───────────────────────────────────────────────────────
 	// scNameColWidth is the only value you need to change to resize the name
 	// column; scTableInner and scCourseNameWidth are derived automatically.

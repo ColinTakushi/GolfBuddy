@@ -350,6 +350,25 @@ async def get_scorecard_detail(username: str, scorecard_id: int, db: Session = D
     }
 
 
+@app.get("/rounds")
+async def list_all_rounds(db: Session = Depends(get_db)):
+    """List all rounds across all users, sorted newest first."""
+    scorecards = db.query(Scorecard).order_by(desc(Scorecard.date_played)).all()
+    result = []
+    for sc in scorecards:
+        for user in sc.users:
+            result.append({
+                "id": sc.id,
+                "course": sc.course.name,
+                "date_played": sc.date_played.isoformat() if sc.date_played else "",
+                "total_score": sc.get_total_score(user.id),
+                "total_par": sc.total_par,
+                "score_differential": sc.get_score_differential(user.id),
+                "player": user.username,
+            })
+    return result
+
+
 @app.get("/scorecards/{scorecard_id}")
 async def get_score_card_from_id(scorecard_id: int, db: Session = Depends(get_db)):
     """Get a scorecard by its ID."""

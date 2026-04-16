@@ -13,6 +13,63 @@ import (
 
 const apiBase = "http://localhost:8000"
 
+// allRoundEntry holds one row in the all-rounds list (includes player name).
+type allRoundEntry struct {
+	ID     int
+	Course string
+	Date   string
+	Score  int
+	Par    int
+	Diff   int
+	Player string
+}
+
+type allRoundsListMsg struct {
+	rounds []allRoundEntry
+	err    error
+}
+
+func cmdFetchAllRounds() tea.Cmd {
+	return func() tea.Msg {
+		resp, err := http.Get(apiBase + "/rounds")
+		if err != nil {
+			return allRoundsListMsg{err: err}
+		}
+		defer resp.Body.Close()
+		body, _ := io.ReadAll(resp.Body)
+
+		var rawRounds []struct {
+			ID                int    `json:"id"`
+			Course            string `json:"course"`
+			DatePlayed        string `json:"date_played"`
+			TotalScore        int    `json:"total_score"`
+			TotalPar          int    `json:"total_par"`
+			ScoreDifferential int    `json:"score_differential"`
+			Player            string `json:"player"`
+		}
+		if err := json.Unmarshal(body, &rawRounds); err != nil {
+			return allRoundsListMsg{err: err}
+		}
+		rounds := make([]allRoundEntry, len(rawRounds))
+		for i, r := range rawRounds {
+			date := r.DatePlayed
+			if len(date) >= 10 {
+				date = date[:10]
+			}
+			rounds[i] = allRoundEntry{
+				ID:     r.ID,
+				Course: r.Course,
+				Date:   date,
+				Score:  r.TotalScore,
+				Par:    r.TotalPar,
+				Diff:   r.ScoreDifferential,
+				Player: r.Player,
+			}
+		}
+		return allRoundsListMsg{rounds: rounds}
+	}
+}
+
 func cmdFetchPlayers() tea.Cmd {
 	return func() tea.Msg {
 		resp, err := http.Get(apiBase + "/users")

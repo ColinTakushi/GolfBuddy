@@ -25,6 +25,8 @@ const (
 	statePlayerDetail
 	stateRoundView
 	stateConfirmDelete
+	stateAllRoundsList
+	stateRoundSummaryView
 )
 
 
@@ -98,6 +100,10 @@ var menu = []menuItem{
 		description: "Browse player statistics.\nSelect a player to view\nrounds and scorecards.",
 	},
 	{
+		label:       "Rounds",
+		description: "Browse all recorded rounds.\nSelect a round to view its\nsummary and optionally edit it.",
+	},
+	{
 		label:       "Nuke",
 		description: "Delete ALL data and recreate\nthe database schema.\nThis cannot be undone.",
 		subItems: []subItem{
@@ -111,6 +117,35 @@ var menu = []menuItem{
 		label:       "Close",
 		description: "Exit GolfBuddy.",
 	},
+}
+
+// ── Round grouping ────────────────────────────────────────────────────────────
+
+type roundGroupData struct {
+	Date    string
+	Course  string
+	Entries []allRoundEntry
+}
+
+// groupRounds partitions a flat allRoundEntry slice into per-scorecard groups.
+// Consecutive entries with the same scorecard ID belong to the same group.
+// The server always returns all players for one scorecard consecutively, so a
+// simple two-pointer walk is sufficient.
+func groupRounds(rounds []allRoundEntry) []roundGroupData {
+	var groups []roundGroupData
+	for i := 0; i < len(rounds); {
+		j := i
+		for j < len(rounds) && rounds[j].ID == rounds[i].ID {
+			j++
+		}
+		groups = append(groups, roundGroupData{
+			Date:    rounds[i].Date,
+			Course:  rounds[i].Course,
+			Entries: rounds[i:j],
+		})
+		i = j
+	}
+	return groups
 }
 
 // ── Messages ─────────────────────────────────────────────────────────────────
@@ -150,6 +185,11 @@ type model struct {
 	playerStats playerStatsData
 	roundID     int // DB scorecard ID for update/delete; 0 = new
 	playerId    int
+	// all-rounds browser
+	allRounds        []allRoundEntry
+	allRoundIdx      int  // index into groupRounds(allRounds)
+	allRoundPlayerIdx int // -1 = card nav mode; ≥0 = player sub-selection within a card
+	fromRoundsMenu   bool // true when round detail was opened from the Rounds menu
 }
 
 func initialModel() model {
@@ -158,10 +198,11 @@ func initialModel() model {
 	ti.Width = menuBodyWidth - 8
 	ti.Prompt = ""
 	return model{
-		state:  stateMainMenu,
-		input:  ti,
-		width:  80,
-		height: 24,
+		state:             stateMainMenu,
+		input:             ti,
+		width:             80,
+		height:            24,
+		allRoundPlayerIdx: -1,
 	}
 }
 
@@ -249,6 +290,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.roundIdx = 0
 		return m, nil
 
+	case allRoundsListMsg:
+		if msg.err != nil {
+			m.output = errorStyle.Render("Failed to load rounds: " + msg.err.Error())
+			m.state = stateOutput
+			return m, nil
+		}
+		m.allRounds = msg.rounds
+		m.allRoundIdx = 0
+		m.allRoundPlayerIdx = -1
+		return m, nil
+
 	case roundDetailMsg:
 		if msg.err != nil {
 			m.output = errorStyle.Render("Failed to load round: " + msg.err.Error())
@@ -259,7 +311,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.roundID = msg.roundID
 		m.cursor = scCell{1, 0}
 		m.editingCell = false
-		m.state = stateRoundView
+		if m.fromRoundsMenu {
+			m.state = stateRoundSummaryView
+		} else {
+			m.state = stateRoundView
+		}
 		return m, nil
 
 	case roundSavedMsg:
@@ -278,6 +334,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.output = errorStyle.Render("Delete failed: " + msg.err.Error())
 			m.state = stateOutput
 			return m, nil
+		}
+		if m.fromRoundsMenu {
+			m.fromRoundsMenu = false
+			m.allRounds = nil
+			m.allRoundIdx = 0
+			m.allRoundPlayerIdx = -1
+			m.state = stateAllRoundsList
+			return m, cmdFetchAllRounds()
 		}
 		m.rounds = nil
 		m.players = nil
@@ -319,8 +383,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateRoundView(msg)
 		case stateConfirmDelete:
 			return m.updateConfirmDeleteNav(msg)
+		case stateAllRoundsList:
+			return m.updateAllRoundsList(msg)
+		case stateRoundSummaryView:
+			return m.updateRoundSummaryView(msg)
 		case stateOutput:
 			m.state = stateMainMenu
+			m.fromRoundsMenu = false
 			m.output = ""
 			return m, nil
 		}
@@ -358,6 +427,12 @@ func (m model) updateMainMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.playerIdx = 0
 			m.state = statePlayerList
 			return m, cmdFetchPlayers()
+		}
+		if item.label == "Rounds" {
+			m.allRounds = nil
+			m.allRoundIdx = 0
+			m.state = stateAllRoundsList
+			return m, cmdFetchAllRounds()
 		}
 		m.subIdx = 0
 		m.state = stateSubMenu
@@ -562,6 +637,10 @@ func (m model) View() string {
 		return m.viewRoundView()
 	case stateConfirmDelete:
 		return m.viewDeleteConfirm()
+	case stateAllRoundsList:
+		return m.viewAllRoundsList()
+	case stateRoundSummaryView:
+		return m.viewRoundSummaryView()
 	}
 	return ""
 }
